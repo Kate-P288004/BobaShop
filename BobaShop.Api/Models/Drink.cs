@@ -47,9 +47,20 @@ namespace BobaShop.Api.Models
         /// <summary>Whether this drink is visible/available for ordering.</summary>
         public bool IsActive { get; set; } = true;
 
-        // -------------------- Magic Three Dates --------------------
+        // ---------------------------------------------------------------------
+        // MAGIC THREE DATES
+        // ---------------------------------------------------------------------
+        // These fields record the lifecycle of each document in MongoDB:
+        //  • CreatedUtc  – the date/time when the record was first created.
+        //  • UpdatedUtc  – the most recent date/time the record was modified.
+        //  • DeletedUtc  – the date/time the record was marked as deleted
+        //                  (used for soft delete instead of physical removal).
+        // All times are stored in UTC (Coordinated Universal Time) format to
+        // maintain consistency across systems and time zones.
+        // ---------------------------------------------------------------------
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedUtc { get; set; }
         public DateTime? DeletedUtc { get; set; }
+
     }
 }
