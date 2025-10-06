@@ -1,15 +1,35 @@
+using BobaShop.Api.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// -----------------------------------------------------------------------------
+// MongoDB Configuration (reads from appsettings.json)
+// -----------------------------------------------------------------------------
+builder.Services.Configure<MongoSettings>(
+    builder.Configuration.GetSection("Mongo"));
 
+builder.Services.AddSingleton<MongoDbContext>();
+
+// -----------------------------------------------------------------------------
+// Add controllers, Swagger, and CORS
+// -----------------------------------------------------------------------------
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy => policy.AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader());
+});
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// -----------------------------------------------------------------------------
+// Configure the HTTP request pipeline
+// -----------------------------------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +37,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
+app.UseCors("AllowAll");
 app.UseAuthorization();
-
 app.MapControllers();
 
 app.Run();
