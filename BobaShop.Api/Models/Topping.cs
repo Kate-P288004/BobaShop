@@ -3,10 +3,6 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace BobaShop.Api.Models;
 
-/// <summary>
-/// Represents a drink topping (e.g., pearls, jelly, pudding)
-/// Includes surcharge, status, and audit timestamps.
-/// </summary>
 public class Topping
 {
     [BsonId]
@@ -18,12 +14,12 @@ public class Topping
 
     [BsonElement("price")]
     [BsonRepresentation(BsonType.Decimal128)]
-    public decimal Price { get; set; } = 0.80m;   // default surcharge
+    public decimal Price { get; set; } = 0.80m;
 
     [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    // Magic Three Dates
+    // Canonical fields used for persistence
     [BsonElement("createdUtc")]
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
@@ -32,4 +28,9 @@ public class Topping
 
     [BsonElement("deletedUtc")]
     public DateTime? DeletedUtc { get; set; }
+
+    // ------ Backward-compatible aliases (compile-only, not stored in Mongo) ------
+    [BsonIgnore] public DateTime CreatedAt { get => CreatedUtc; set => CreatedUtc = value; }
+    [BsonIgnore] public DateTime? UpdatedAt { get => UpdatedUtc; set => UpdatedUtc = value; }
+    [BsonIgnore] public DateTime? DeletedAt { get => DeletedUtc; set => DeletedUtc = value; }
 }
