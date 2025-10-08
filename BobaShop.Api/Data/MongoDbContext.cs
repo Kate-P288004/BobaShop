@@ -23,8 +23,9 @@ namespace BobaShop.Api.Data
         // Explicit collections used by controllers
         public IMongoCollection<Drink> Drinks => _database.GetCollection<Drink>("drinks");
         public IMongoCollection<Topping> Toppings => _database.GetCollection<Topping>("toppings");
+        public IMongoCollection<Order> Orders => _database.GetCollection<Order>("orders");
 
-      
+
         public IMongoCollection<T> GetCollection<T>(string name) => _database.GetCollection<T>(name);
     }
 }

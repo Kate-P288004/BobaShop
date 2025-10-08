@@ -33,6 +33,9 @@ namespace BobaShop.Api.Models
         /// <summary>Base price for the default size.</summary>
         public decimal BasePrice { get; set; } = 6.00m;
 
+        [BsonRepresentation(BsonType.Decimal128)]
+        public decimal Price { get; set; }
+
         // Size upcharges (0 means included in base).
         public decimal SmallUpcharge { get; set; } = 0.00m;
         public decimal MediumUpcharge { get; set; } = 0.50m;
