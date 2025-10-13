@@ -1,7 +1,5 @@
 ﻿using System.Net.Http;
 using System.Net.Http.Json;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using BobaShop.Web.Models;
 
 namespace BobaShop.Web.Services
@@ -12,6 +10,10 @@ namespace BobaShop.Web.Services
         public ApiService(HttpClient http) => _http = http;
 
         public async Task<List<ProductViewModel>> GetProductsAsync()
-            => await _http.GetFromJsonAsync<List<ProductViewModel>>("https://localhost:5001/api/products");
+        {
+            // If the API returns null (e.g., 204), fall back to an empty list to avoid CS8603
+            var data = await _http.GetFromJsonAsync<List<ProductViewModel>>("api/products");
+            return data ?? new List<ProductViewModel>();
+        }
     }
 }
