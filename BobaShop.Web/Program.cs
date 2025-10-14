@@ -1,4 +1,4 @@
-// Program.cs — BobaShop.Web
+// Program.cs ï¿½ BobaShop.Web
 
 using System;
 using BobaShop.Web.Data;
