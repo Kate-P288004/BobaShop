@@ -1,0 +1,129 @@
+﻿@model BobaShop.Web.Models.ProductDetailsViewModel
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<div class="row g-4">
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <img src="@Model.ImageUrl" class="card-img-top rounded-top" alt="@Model.Name" />
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h2 class="fw-bold">@Model.Name</h2>
+                <div class="text-muted mb-2">Customize your drink</div>
+
+                <!-- Size -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Size</label>
+                    <div class="d-flex gap-2">
+                        <input type="radio" class="btn-check" name="size" id="sizeS" value="S" checked>
+                        <label class="btn btn-outline-dark btn-sm" for="sizeS">Small</label>
+
+                        <input type="radio" class="btn-check" name="size" id="sizeM" value="M">
+                        <label class="btn btn-outline-dark btn-sm" for="sizeM">Medium (+$0.70)</label>
+
+                        <input type="radio" class="btn-check" name="size" id="sizeL" value="L">
+                        <label class="btn btn-outline-dark btn-sm" for="sizeL">Large (+$1.20)</label>
+                    </div>
+                </div>
+
+                <!-- Sugar -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Sugar: <span id="sugarLabel">100%</span></label>
+                    <input type="range" class="form-range" min="0" max="100" step="25" id="sugar" value="100">
+                </div>
+
+                <!-- Ice -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Ice: <span id="iceLabel">100%</span></label>
+                    <input type="range" class="form-range" min="0" max="100" step="25" id="ice" value="100">
+                </div>
+
+                <!-- Toppings -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Toppings</label>
+                    <div class="row">
+                        @for (var i = 0; i < Model.Toppings.Count; i++)
+                        {
+                            var t = Model.Toppings[i];
+                            <div class="col-12 col-sm-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input topping" type="checkbox"
+                                           data-price="@t.Price" id="tp-@t.Code">
+                                    <label class="form-check-label" for="tp-@t.Code">
+                                        @t.Name <span class="text-muted">(+@t.Price.ToString("C2"))</span>
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Price + Add to Cart -->
+                <div class="d-flex align-items-center justify-content-between mt-4">
+                    <div>
+                        <div class="text-muted small">Estimated total</div>
+                        <div class="h4 mb-0" id="priceTotal">@Model.BasePrice.ToString("C2")</div>
+                    </div>
+                    <button class="btn btn-dark btn-lg" id="btnAddToCart" type="button">
+                        Add to Cart
+                    </button>
+                </div>
+                <div class="form-text mt-2">Price updates as you change size/toppings.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const base = @Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            const sugar = document.getElementById('sugar');
+            const ice = document.getElementById('ice');
+            const sugarLabel = document.getElementById('sugarLabel');
+            const iceLabel = document.getElementById('iceLabel');
+            const priceEl = document.getElementById('priceTotal');
+            const sizeRadios = document.querySelectorAll('input[name="size"]');
+            const toppings = document.querySelectorAll('.topping');
+
+            function sizeUpcharge() {
+                const v = document.querySelector('input[name="size"]:checked').value;
+                if (v === 'M') return 0.70;
+                if (v === 'L') return 1.20;
+                return 0.0;
+            }
+
+            function toppingsTotal() {
+                let sum = 0;
+                toppings.forEach(cb => { if (cb.checked) sum += parseFloat(cb.dataset.price); });
+                return sum;
+            }
+
+            function formatCurrency(num) {
+                return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'AUD' }).format(num);
+            }
+
+            function updatePrice() {
+                const total = base + sizeUpcharge() + toppingsTotal();
+                priceEl.textContent = formatCurrency(total);
+            }
+
+            sugar.addEventListener('input', e => { sugarLabel.textContent = e.target.value + '%'; });
+            ice.addEventListener('input', e => { iceLabel.textContent = e.target.value + '%'; });
+            sizeRadios.forEach(r => r.addEventListener('change', updatePrice));
+            toppings.forEach(t => t.addEventListener('change', updatePrice));
+
+            updatePrice();
+
+            document.getElementById('btnAddToCart').addEventListener('click', () => {
+                // For now, just a friendly confirmation.
+                alert('Added to cart: @Model.Name');
+            });
+        })();
+    </script>
+}

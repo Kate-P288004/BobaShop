@@ -1,38 +1,46 @@
 ﻿// ---------------------------------------------------------------
 // File: ProductsController.cs
-// Student: Kate Odabas (P288004)
-// Project: Boba Shop – Product Catalog Page
-// Description: Displays product list and later connects to API.
+// Step 3: Details + Customize (placeholder data)
 // ---------------------------------------------------------------
-
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
+using BobaShop.Web.Models;
 
 namespace BobaShop.Web.Controllers
 {
     public class ProductsController : Controller
     {
-        public IActionResult Index()
+        // In-memory placeholder list (replace with API later)
+        private static readonly List<ProductViewModel> _products = new()
         {
-            // Placeholder data — later this will come from the API (GET /api/v1/products)
-            var products = new List<ProductViewModel>
+            new ProductViewModel { Id = "1", Name = "Classic Milk Tea", Price = 6.50, ImageUrl = "/images/classic-milk-tea.jpg" },
+            new ProductViewModel { Id = "2", Name = "Brown Sugar Boba", Price = 7.00, ImageUrl = "/images/brown-sugar-boba.jpg" },
+            new ProductViewModel { Id = "3", Name = "Taro Milk Tea", Price = 6.80, ImageUrl = "/images/taro-milk-tea.jpg" },
+            new ProductViewModel { Id = "4", Name = "Mango Green Tea", Price = 6.20, ImageUrl = "/images/mango-green-tea.jpg" }
+        };
+
+        public IActionResult Index() => View(_products);
+
+        [HttpGet]
+        public IActionResult Details(string id)
+        {
+            var p = _products.FirstOrDefault(x => x.Id == id);
+            if (p is null) return NotFound();
+
+            var vm = new ProductDetailsViewModel
             {
-                new ProductViewModel { Id = "1", Name = "Classic Milk Tea", Price = 6.50, ImageUrl = "/images/classic-milk-tea.jpg" },
-    new ProductViewModel { Id = "2", Name = "Brown Sugar Boba", Price = 7.00, ImageUrl = "/images/brown-sugar-boba.jpg" },
-    new ProductViewModel { Id = "3", Name = "Taro Milk Tea", Price = 6.80, ImageUrl = "/images/taro-milk-tea.jpg" },
-    new ProductViewModel { Id = "4", Name = "Mango Green Tea", Price = 6.20, ImageUrl = "/images/mango-green-tea.jpg" }
+                Id = p.Id,
+                Name = p.Name,
+                ImageUrl = p.ImageUrl,
+                BasePrice = p.Price,
+                Toppings = new List<ToppingOption>
+                {
+                    new() { Code="pearls", Name="Tapioca Pearls", Price=0.80 },
+                    new() { Code="pudding", Name="Egg Pudding",   Price=1.00 },
+                    new() { Code="grass",   Name="Grass Jelly",   Price=0.90 },
+                    new() { Code="lychee",  Name="Lychee Jelly",  Price=0.90 }
+                }
             };
-
-            return View(products);
+            return View(vm);
         }
-    }
-
-    // simple view model
-    public class ProductViewModel
-    {
-        public string Id { get; set; }
-        public string Name { get; set; }
-        public double Price { get; set; }
-        public string ImageUrl { get; set; }
     }
 }
