@@ -17,10 +17,10 @@ namespace BobaShop.Web.Controllers
             // Placeholder data — later this will come from the API (GET /api/v1/products)
             var products = new List<ProductViewModel>
             {
-                new ProductViewModel { Id = "1", Name = "Classic Milk Tea", Price = 6.50, ImageUrl = "/images/milktea1.jpg" },
-                new ProductViewModel { Id = "2", Name = "Brown Sugar Boba", Price = 7.00, ImageUrl = "/images/brownsugar.jpg" },
-                new ProductViewModel { Id = "3", Name = "Taro Milk Tea", Price = 6.80, ImageUrl = "/images/taro.jpg" },
-                new ProductViewModel { Id = "4", Name = "Mango Green Tea", Price = 6.20, ImageUrl = "/images/mango.jpg" }
+                new ProductViewModel { Id = "1", Name = "Classic Milk Tea", Price = 6.50, ImageUrl = "/images/classic-milk-tea.jpg" },
+    new ProductViewModel { Id = "2", Name = "Brown Sugar Boba", Price = 7.00, ImageUrl = "/images/brown-sugar-boba.jpg" },
+    new ProductViewModel { Id = "3", Name = "Taro Milk Tea", Price = 6.80, ImageUrl = "/images/taro-milk-tea.jpg" },
+    new ProductViewModel { Id = "4", Name = "Mango Green Tea", Price = 6.20, ImageUrl = "/images/mango-green-tea.jpg" }
             };
 
             return View(products);
