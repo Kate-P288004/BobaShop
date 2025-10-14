@@ -5,21 +5,30 @@ using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// MVC
+// MVC + Razor Pages (Identity UI uses Razor Pages)
 builder.Services.AddControllersWithViews();
+builder.Services.AddRazorPages();
 
-// --- Identity + EF Core (SQLite)
+// --- EF Core (SQLite) for Identity
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// --- Identity + UI
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false; // ok for assessment
+    options.SignIn.RequireConfirmedAccount = false; //for assessment
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequiredLength = 6;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// --- Identity cookies (redirects)
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Identity/Account/Login";
+    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+});
 
 // HttpClient for API
 builder.Services.AddHttpClient<ApiService>(client =>
@@ -40,7 +49,6 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// --- Identity cookies
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -48,7 +56,7 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// --- Identity UI endpoints
-app.MapRazorPages(); // needed for scaffolded Identity pages
+// Identity UI endpoints
+app.MapRazorPages();
 
 app.Run();
