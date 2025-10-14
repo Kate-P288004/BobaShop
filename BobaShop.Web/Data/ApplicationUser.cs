@@ -1,17 +1,10 @@
-﻿using Microsoft.AspNetCore.Identity;
-
-namespace BobaShop.Web.Data
-{
-    public class ApplicationUser
-    {
-    }
-}
+﻿// File: BobaShop.Web/Data/ApplicationUser.cs
 using Microsoft.AspNetCore.Identity;
 
 namespace BobaShop.Web.Data
 {
     public class ApplicationUser : IdentityUser
     {
-        // add profile fields later if needed
+        // add optional profile fields later
     }
 }
