@@ -1,16 +1,27 @@
-﻿@model IEnumerable<BobaShop.Web.Models.ProductViewModel>
+﻿@model IEnumerable<BobaShop.Web.Controllers.ProductViewModel>
 
-<h2 class="mt-3">BobaShop Menu</h2>
-<div class="row">
+@{
+    ViewData["Title"] = "Menu";
+}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold text-dark">Our Drinks Menu</h2>
+    <p class="text-muted">Choose your favourite bubble tea and customize it!</p>
+</div>
+
+<div class="row g-4">
     @foreach (var item in Model)
     {
-        <div class="col-md-3 mb-4">
-            <div class="card h-100 shadow-sm">
-                <img src="@item.ImageUrl" class="card-img-top" alt="@item.Name" />
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+            <div class="card shadow-sm h-100 border-0">
+                <img src="@item.ImageUrl" class="card-img-top rounded-top" alt="@item.Name">
                 <div class="card-body text-center">
-                    <h5 class="card-title">@item.Name</h5>
-                    <p class="text-muted mb-2">$@item.Price</p>
-                    <button class="btn btn-primary">Add to Cart</button>
+                    <h5 class="card-title fw-semibold">@item.Name</h5>
+                    <p class="card-text text-secondary">$@item.Price.ToString("0.00")</p>
+                    <a asp-controller="Products" asp-action="Details" asp-route-id="@item.Id"
+                       class="btn btn-sm btn-outline-dark">
+                        Customize
+                    </a>
                 </div>
             </div>
         </div>
