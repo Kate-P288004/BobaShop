@@ -1,10 +1,10 @@
-// Program.cs � BobaShop.Web
-
-using System;
+// Program.cs — BobaShop.Web
 using BobaShop.Web.Data;
 using BobaShop.Web.Services;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,12 +12,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Services
 // ------------------------------------------------------------
 
-// MVC + Razor Pages (Identity UI uses Razor Pages under the hood)
+// MVC + Razor Pages (Identity UI uses Razor Pages)
 builder.Services.AddControllersWithViews();
 builder.Services.AddRazorPages();
 
 // EF Core (SQLite) for Identity
-// appsettings.json must contain:
 // "ConnectionStrings": { "DefaultConnection": "Data Source=app_identity.db" }
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -25,14 +24,14 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // ASP.NET Core Identity (with UI)
 builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false; // fine for assessment
+    options.SignIn.RequireConfirmedAccount = false; // ok for assessment
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequiredLength = 6;
 })
 .AddEntityFrameworkStores<ApplicationDbContext>();
 
-// Identity cookie paths (redirect unauthenticated users to Login)
+// Identity cookie paths
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Identity/Account/Login";
@@ -40,7 +39,6 @@ builder.Services.ConfigureApplicationCookie(options =>
 });
 
 // Typed HttpClient for your API calls
-// appsettings.json must contain:
 // "ApiBaseUrl": "https://localhost:5001/"
 builder.Services.AddHttpClient<ApiService>(client =>
 {
@@ -49,6 +47,17 @@ builder.Services.AddHttpClient<ApiService>(client =>
         throw new InvalidOperationException("ApiBaseUrl is not configured in appsettings.json.");
     client.BaseAddress = new Uri(baseUrl);
 });
+
+// -------------------- Cart (Session) --------------------
+builder.Services.AddSession(opts =>
+{
+    opts.IdleTimeout = TimeSpan.FromHours(2);
+    opts.Cookie.HttpOnly = true;
+    opts.Cookie.IsEssential = true;
+});
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICartService, CartService>();
+// --------------------------------------------------------
 
 var app = builder.Build();
 
@@ -68,6 +77,8 @@ app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.UseSession(); // <-- session must be before endpoint mapping
 
 // MVC default route
 app.MapControllerRoute(
