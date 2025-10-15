@@ -1,7 +1,6 @@
 // Program.cs — BobaShop.Web
 using BobaShop.Web.Data;
 using BobaShop.Web.Services;
-using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -48,7 +47,7 @@ builder.Services.AddHttpClient<ApiService>(client =>
     client.BaseAddress = new Uri(baseUrl);
 });
 
-// -------------------- Cart (Session) --------------------
+// -------------------- Cart (Session + Service) --------------------
 builder.Services.AddSession(opts =>
 {
     opts.IdleTimeout = TimeSpan.FromHours(2);
@@ -57,22 +56,7 @@ builder.Services.AddSession(opts =>
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICartService, CartService>();
-
-
-
-// -------------------- Cart (Session + Service) --------------------
-builder.Services.AddSession(opts =>
-{
-    opts.IdleTimeout = TimeSpan.FromHours(2);
-    opts.Cookie.HttpOnly = true;
-    opts.Cookie.IsEssential = true;
-});
-
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<BobaShop.Web.Services.ICartService, BobaShop.Web.Services.CartService>();
 // ---------------------------------------------------------------
-
-// --------------------------------------------------------
 
 var app = builder.Build();
 
@@ -93,7 +77,7 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseSession(); // <-- session must be before endpoint mapping
+app.UseSession(); // session BEFORE endpoints
 
 // MVC default route
 app.MapControllerRoute(
