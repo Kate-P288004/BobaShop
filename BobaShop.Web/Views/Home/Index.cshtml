@@ -2,12 +2,147 @@
     ViewData["Title"] = "Home";
 }
 
-<div class="text-center mt-5">
-    <h1 class="display-4 fw-bold text-dark">Welcome to 🧋 Boba Shop</h1>
-    <p class="lead mt-3">
-        Customize your perfect drink – choose sugar %, ice %, and toppings just the way you like it!
-    </p>
-    <a asp-controller="Products" asp-action="Index" class="btn btn-lg btn-light border mt-4 shadow-sm">
-        Explore Menu
-    </a>
-</div>
+<!-- HERO -->
+<section class="position-relative overflow-hidden rounded-4 shadow-sm" style="background: linear-gradient(180deg, rgba(139,92,246,.25), rgba(243,232,255,.9));">
+    <div class="row g-0 align-items-center">
+        <div class="col-12 col-lg-6 p-5 p-lg-6">
+            <span class="badge bg-dark mb-3">✨ New • Limited Specials</span>
+            <h1 class="display-5 fw-bold text-dark">Craft your perfect <span class="text-decoration-underline">BoBa</span></h1>
+            <p class="lead mt-3 text-secondary">
+                Choose size, sugar, ice, and toppings — your drink, your rules. Always fresh. Always BoBaTastic.
+            </p>
+            <div class="d-flex gap-2 mt-4">
+                <a asp-controller="Products" asp-action="Index" class="btn btn-dark btn-lg">Explore Menu</a>
+                <a asp-controller="Rewards" asp-action="Index" class="btn btn-outline-dark btn-lg">Rewards</a>
+            </div>
+
+            <!-- Category chips -->
+            <div class="d-flex flex-wrap gap-2 mt-4">
+                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Milk Tea</a>
+                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Fruit Tea</a>
+                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Brown Sugar</a>
+                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Taro</a>
+            </div>
+
+            <!-- Trust row -->
+            <div class="d-flex flex-wrap align-items-center gap-3 mt-4 text-secondary small">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-dark">5★</span> Loved by students
+                </div>
+                <div class="vr d-none d-sm-block"></div>
+                <div>Fresh pearls daily</div>
+                <div class="vr d-none d-sm-block"></div>
+                <div>Made in Perth</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6 p-0">
+            <div class="ratio ratio-1x1 ratio-lg-16x9">
+                <img src="/images/hero-boba.jpg"
+                     alt="BoBaTastic assortment of colorful bubble tea drinks"
+                     class="w-100 h-100 object-fit-cover" />
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FEATURED / POPULAR PICKS -->
+<section class="mt-5">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h2 class="fw-bold text-dark m-0">Popular Picks</h2>
+        <a asp-controller="Products" asp-action="Index" class="text-dark text-decoration-none">See all →</a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Card 1 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/brown-sugar-boba.jpg" class="card-img-top rounded-top" alt="Brown Sugar Boba" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Brown Sugar Boba</h5>
+                    <p class="card-text text-secondary small mb-3">Caramel swirls. Rich, creamy, iconic.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$7.00</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="2" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/taro-milk-tea.jpg" class="card-img-top rounded-top" alt="Taro Milk Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Taro Milk Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Velvety taro with a nutty finish.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.80</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="3" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/mango-green-tea.jpg" class="card-img-top rounded-top" alt="Mango Green Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Mango Green Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Zesty, juicy, ultra-refreshing.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.20</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="4" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/classic-milk-tea.jpg" class="card-img-top rounded-top" alt="Classic Milk Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Classic Milk Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Smooth classic with tapioca pearls.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.50</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="1" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- VALUE PROPS -->
+<section class="mt-5">
+    <div class="row g-3">
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Tailor Every Sip</h6>
+                <p class="text-secondary mb-0 small">Size, sugar, ice, toppings — fully customizable in a couple of taps.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Fresh Daily</h6>
+                <p class="text-secondary mb-0 small">Brewed teas and pearls cooked fresh throughout the day.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Rewards that Add Up</h6>
+                <p class="text-secondary mb-0 small">Earn 10 pts per $10. Redeem 100 pts for a free drink.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA STRIP -->
+<section class="mt-5 mb-2 p-4 p-md-5 rounded-4 text-center shadow-sm" style="background-color:#8B5CF6;">
+    <h3 class="fw-bold text-white mb-2">Ready for your BoBa moment?</h3>
+    <p class="text-white-50 mb-4">Pick a flavour, tweak the sweetness, choose the crunch. It’s all you.</p>
+    <a asp-controller="Products" asp-action="Index" class="btn btn-light btn-lg">Order Now</a>
+</section>
