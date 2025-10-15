@@ -1,0 +1,92 @@
+﻿@model BobaShop.Web.Models.CartViewModel
+@{
+    ViewData["Title"] = "Cart";
+}
+
+<h2 class="fw-bold mb-3">Your Cart</h2>
+
+@if (!Model.Items.Any())
+{
+    <div class="alert alert-light border">Your cart is empty. <a asp-controller="Products" asp-action="Index">Browse drinks</a>.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Options</th>
+                    <th class="text-end">Unit Price</th>
+                    <th style="width:120px;">Qty</th>
+                    <th class="text-end">Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var it in Model.Items)
+                {
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="@it.ImageUrl" alt="@it.Name" style="width:72px;height:72px;object-fit:cover;border-radius:12px;" />
+                                <div>
+                                    <div class="fw-semibold">@it.Name</div>
+                                    <div class="text-muted small">@it.ProductId</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="small">
+                            <div>Size: <strong>@it.Size</strong></div>
+                            <div>Sugar: <strong>@it.Sugar%</strong>, Ice: <strong>@it.Ice%</strong></div>
+                            @if (!string.IsNullOrWhiteSpace(it.ToppingsSummary))
+                            {
+                                <div>Toppings: <span>@it.ToppingsSummary</span></div>
+                            }
+                        </td>
+                        <td class="text-end">@it.UnitPrice.ToString("C2")</td>
+                        <td>
+                            <form asp-action="UpdateQty" method="post" class="d-flex gap-2">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="productId" value="@it.ProductId" />
+                                <input type="hidden" name="size" value="@it.Size" />
+                                <input type="hidden" name="sugar" value="@it.Sugar" />
+                                <input type="hidden" name="ice" value="@it.Ice" />
+                                <input type="hidden" name="toppingsSummary" value="@it.ToppingsSummary" />
+                                <input type="number" name="qty" class="form-control form-control-sm" value="@it.Quantity" min="1" style="width:80px;" />
+                                <button class="btn btn-sm btn-outline-dark" type="submit">Update</button>
+                            </form>
+                        </td>
+                        <td class="text-end fw-semibold">@it.Subtotal.ToString("C2")</td>
+                        <td class="text-end">
+                            <form asp-action="Remove" method="post">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="productId" value="@it.ProductId" />
+                                <input type="hidden" name="size" value="@it.Size" />
+                                <input type="hidden" name="sugar" value="@it.Sugar" />
+                                <input type="hidden" name="ice" value="@it.Ice" />
+                                <input type="hidden" name="toppingsSummary" value="@it.ToppingsSummary" />
+                                <button class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-end fw-semibold">Total</td>
+                    <td class="text-end fw-bold">@Model.Total.ToString("C2")</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="d-flex justify-content-between">
+        <form asp-action="Clear" method="post">
+            @Html.AntiForgeryToken()
+            <button class="btn btn-outline-danger">Clear Cart</button>
+        </form>
+        <a asp-controller="Checkout" asp-action="Index" class="btn btn-dark">Checkout</a>
+    </div>
+}
