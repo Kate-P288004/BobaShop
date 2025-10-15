@@ -4,12 +4,14 @@
 }
 
 <div class="row g-4">
+    <!-- Left: Product Image -->
     <div class="col-12 col-lg-6">
         <div class="card border-0 shadow-sm">
             <img src="@Model.ImageUrl" class="card-img-top rounded-top" alt="@Model.Name" />
         </div>
     </div>
 
+    <!-- Right: Customisation + Add to Cart -->
     <div class="col-12 col-lg-6">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
@@ -53,7 +55,7 @@
                             <div class="col-12 col-sm-6 mb-2">
                                 <div class="form-check">
                                     <input class="form-check-input topping" type="checkbox"
-                                           data-price="@t.Price" id="tp-@t.Code">
+                                           name="toppings" value="@t.Code" data-price="@t.Price" id="tp-@t.Code">
                                     <label class="form-check-label" for="tp-@t.Code">
                                         @t.Name <span class="text-muted">(+@t.Price.ToString("C2"))</span>
                                     </label>
@@ -63,17 +65,29 @@
                     </div>
                 </div>
 
-                <!-- Price + Add to Cart -->
-                <div class="d-flex align-items-center justify-content-between mt-4">
+                <!-- Add to Cart Form -->
+                <form asp-controller="Cart" asp-action="Add" method="post" class="d-flex align-items-center justify-content-between mt-4">
+                    @Html.AntiForgeryToken()
+
+                    <!-- Hidden fields -->
+                    <input type="hidden" name="ProductId" value="@Model.Id" />
+                    <input type="hidden" name="Name" value="@Model.Name" />
+                    <input type="hidden" name="ImageUrl" value="@Model.ImageUrl" />
+                    <input type="hidden" name="Size" id="formSize" value="S" />
+                    <input type="hidden" name="Sugar" id="formSugar" value="100" />
+                    <input type="hidden" name="Ice" id="formIce" value="100" />
+                    <input type="hidden" name="ToppingsSummary" id="formToppings" value="" />
+                    <input type="hidden" name="UnitPrice" id="formPrice" value="@Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+                    <input type="hidden" name="Quantity" value="1" />
+
                     <div>
                         <div class="text-muted small">Estimated total</div>
                         <div class="h4 mb-0" id="priceTotal">@Model.BasePrice.ToString("C2")</div>
                     </div>
-                    <button class="btn btn-dark btn-lg" id="btnAddToCart" type="button">
-                        Add to Cart
-                    </button>
-                </div>
-                <div class="form-text mt-2">Price updates as you change size/toppings.</div>
+                    <button class="btn btn-dark btn-lg" type="submit">Add to Cart</button>
+                </form>
+
+                <div class="form-text mt-2">Price updates as you change size or toppings.</div>
             </div>
         </div>
     </div>
@@ -82,14 +96,21 @@
 @section Scripts {
     <script>
         (function () {
-            const base = @Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            const sugar = document.getElementById('sugar');
-            const ice = document.getElementById('ice');
-            const sugarLabel = document.getElementById('sugarLabel');
-            const iceLabel = document.getElementById('iceLabel');
+            const basePrice = parseFloat('@Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture)');
             const priceEl = document.getElementById('priceTotal');
             const sizeRadios = document.querySelectorAll('input[name="size"]');
             const toppings = document.querySelectorAll('.topping');
+            const sugar = document.getElementById('sugar');
+            const ice = document.getElementById('ice');
+
+            const sugarLabel = document.getElementById('sugarLabel');
+            const iceLabel = document.getElementById('iceLabel');
+
+            const formSize = document.getElementById('formSize');
+            const formSugar = document.getElementById('formSugar');
+            const formIce = document.getElementById('formIce');
+            const formToppings = document.getElementById('formToppings');
+            const formPrice = document.getElementById('formPrice');
 
             function sizeUpcharge() {
                 const v = document.querySelector('input[name="size"]:checked').value;
@@ -100,7 +121,15 @@
 
             function toppingsTotal() {
                 let sum = 0;
-                toppings.forEach(cb => { if (cb.checked) sum += parseFloat(cb.dataset.price); });
+                const names = [];
+                toppings.forEach(cb => {
+                    if (cb.checked) {
+                        const p = parseFloat(cb.dataset.price);
+                        sum += p;
+                        names.push(cb.labels[0].innerText.trim());
+                    }
+                });
+                formToppings.value = names.join(", ");
                 return sum;
             }
 
@@ -109,21 +138,28 @@
             }
 
             function updatePrice() {
-                const total = base + sizeUpcharge() + toppingsTotal();
+                const total = basePrice + sizeUpcharge() + toppingsTotal();
                 priceEl.textContent = formatCurrency(total);
+                formPrice.value = total.toFixed(2);
             }
 
-            sugar.addEventListener('input', e => { sugarLabel.textContent = e.target.value + '%'; });
-            ice.addEventListener('input', e => { iceLabel.textContent = e.target.value + '%'; });
-            sizeRadios.forEach(r => r.addEventListener('change', updatePrice));
+            // sync hidden fields
+            sizeRadios.forEach(r => r.addEventListener('change', () => {
+                formSize.value = r.value;
+                updatePrice();
+            }));
+
+            sugar.addEventListener('input', e => {
+                sugarLabel.textContent = e.target.value + '%';
+                formSugar.value = e.target.value;
+            });
+            ice.addEventListener('input', e => {
+                iceLabel.textContent = e.target.value + '%';
+                formIce.value = e.target.value;
+            });
             toppings.forEach(t => t.addEventListener('change', updatePrice));
 
             updatePrice();
-
-            document.getElementById('btnAddToCart').addEventListener('click', () => {
-                // For now, just a friendly confirmation.
-                alert('Added to cart: @Model.Name');
-            });
         })();
     </script>
 }

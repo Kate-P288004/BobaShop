@@ -57,6 +57,21 @@ builder.Services.AddSession(opts =>
 });
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICartService, CartService>();
+
+
+
+// -------------------- Cart (Session + Service) --------------------
+builder.Services.AddSession(opts =>
+{
+    opts.IdleTimeout = TimeSpan.FromHours(2);
+    opts.Cookie.HttpOnly = true;
+    opts.Cookie.IsEssential = true;
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<BobaShop.Web.Services.ICartService, BobaShop.Web.Services.CartService>();
+// ---------------------------------------------------------------
+
 // --------------------------------------------------------
 
 var app = builder.Build();
