@@ -1,22 +1,79 @@
-html {
-  font-size: 14px;
+/* Base */
+html { font-size: 14px; position: relative; min-height: 100%; }
+@media (min-width: 768px) { html { font-size: 16px; } }
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.25rem #258cfb;
+}
+body { margin-bottom: 60px; }
+
+/* ==========================
+   Twisty-style HERO (single source of truth)
+   ========================== */
+.hero-twisty {
+  min-height: 56vh;
+  background: linear-gradient(180deg, #E9D5FF 0%, #F3E8FF 65%, #F5F3FF 100%);
 }
 
-@media (min-width: 768px) {
-  html {
-    font-size: 16px;
-  }
+/* Side drinks (one definition only) */
+.hero-side {
+  position: absolute;
+  bottom: 0;
+  width: 40vw;
+  max-width: 560px;
+  height: auto;
+  object-fit: cover;
+  filter: drop-shadow(0 18px 34px rgba(0,0,0,.18));
+  user-select: none;
+  pointer-events: none;
+  animation: floatY 5s ease-in-out infinite;
+}
+.hero-left  { left: -4vw;  transform: translateY(6px); }
+.hero-right { right: -4vw;  transform: translateY(6px); }
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(6px); }
+  50%      { transform: translateY(-6px); }
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+/* Center panel */
+.hero-panel {
+  margin-top: clamp(2rem, 6vh, 4rem);
+  margin-bottom: clamp(2rem, 6vh, 4rem);
+  max-width: 720px;
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1.25rem, 4vw, 2.5rem);
+  border-radius: 24px;
+  /* Fallback + modern mix */
+  background: #ffffff;
+  background: color-mix(in srgb, #FFFFFF 78%, #F3E8FF 22%);
+  box-shadow: 0 10px 30px rgba(31,41,55,.10);
+  border: 1px solid rgba(139,92,246,.18);
 }
+.hero-panel h1 { color: #2B2B2B; line-height: 1.15; }
 
-html {
-  position: relative;
-  min-height: 100%;
+/* Small logo chip */
+.hero-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .4rem .75rem;
+  border-radius: 999px;
+  background: #FFF;
+  border: 1px solid rgba(0,0,0,.06);
+  box-shadow: 0 4px 12px rgba(0,0,0,.06);
 }
+.hero-mark-icon { width: 28px; height: 28px; }
+.hero-mark-text { font-weight: 600; color: #6B21A8; letter-spacing: .2px; }
 
-body {
-  margin-bottom: 60px;
+/* Responsive */
+@media (max-width: 991.98px) {
+  .hero-side { width: 46vw; }
+  .hero-left  { left: -8vw; }
+  .hero-right { right: -8vw; }
+}
+@media (max-width: 575.98px) {
+  .hero-twisty { min-height: auto; }
+  .hero-side { display: none !important; } /* hide big photos on phones */
+  .hero-panel { margin: 1.25rem auto; }
 }

@@ -2,49 +2,33 @@
     ViewData["Title"] = "Home";
 }
 
-<!-- HERO -->
-<section class="position-relative overflow-hidden rounded-4 shadow-sm" style="background: linear-gradient(180deg, rgba(139,92,246,.25), rgba(243,232,255,.9));">
-    <div class="row g-0 align-items-center">
-        <div class="col-12 col-lg-6 p-5 p-lg-6">
-            <span class="badge bg-dark mb-3">✨ New • Limited Specials</span>
-            <h1 class="display-5 fw-bold text-dark">Craft your perfect <span class="text-decoration-underline">BoBa</span></h1>
-            <p class="lead mt-3 text-secondary">
-                Choose size, sugar, ice, and toppings — your drink, your rules. Always fresh. Always BoBaTastic.
-            </p>
-            <div class="d-flex gap-2 mt-4">
-                <a asp-controller="Products" asp-action="Index" class="btn btn-dark btn-lg">Explore Menu</a>
-                <a asp-controller="Rewards" asp-action="Index" class="btn btn-outline-dark btn-lg">Rewards</a>
+<!-- HERO: Twisty-style (center panel + large side images) -->
+<section class="hero-twisty position-relative overflow-hidden rounded-4 shadow-sm">
+    <!-- Left drink -->
+    <img src="~/images/hero-left.jpg" asp-append-version="true"
+         alt="Matcha boba" class="hero-side hero-left d-none d-md-block" />
+
+    <!-- Right drink -->
+    <img src="~/images/hero-right.jpg" asp-append-version="true"
+         alt="Mango boba" class="hero-side hero-right d-none d-md-block" />
+
+    <!-- Center content panel -->
+    <div class="container position-relative">
+        <div class="hero-panel mx-auto text-center">
+            <div class="hero-mark mb-3">
+                <img src="~/images/icon-bo.png" asp-append-version="true" alt="" class="hero-mark-icon" aria-hidden="true">
+                <span class="hero-mark-text">BoBaTastic</span>
             </div>
 
-            <!-- Category chips -->
-            <div class="d-flex flex-wrap gap-2 mt-4">
-                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Milk Tea</a>
-                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Fruit Tea</a>
-                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Brown Sugar</a>
-                <a class="btn btn-sm btn-light border shadow-sm" asp-controller="Products" asp-action="Index">Taro</a>
-            </div>
+            <h1 class="display-5 fw-bold mb-3">Welcome to the<br />bubble tea world</h1>
 
-            <!-- Trust row -->
-            <div class="d-flex flex-wrap align-items-center gap-3 mt-4 text-secondary small">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-dark">5★</span> Loved by students
-                </div>
-                <div class="vr d-none d-sm-block"></div>
-                <div>Fresh pearls daily</div>
-                <div class="vr d-none d-sm-block"></div>
-                <div>Made in Perth</div>
-            </div>
-        </div>
-
-        <div class="col-12 col-lg-6 p-0">
-            <div class="ratio ratio-1x1 ratio-lg-16x9">
-                <img src="/images/hero-boba.jpg"
-                     alt="BoBaTastic assortment of colorful bubble tea drinks"
-                     class="w-100 h-100 object-fit-cover" />
-            </div>
+            <a asp-controller="Products" asp-action="Index" class="btn btn-dark btn-lg px-4" aria-label="Shop bubble tea now">
+                Shop Now
+            </a>
         </div>
     </div>
 </section>
+
 
 <!-- FEATURED / POPULAR PICKS -->
 <section class="mt-5">

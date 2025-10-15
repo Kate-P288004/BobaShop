@@ -4,7 +4,8 @@ File: _Layout.cshtml
 Student: Kate Odabas (P288004)
 Project: BoBaTastic – Web UI Base Layout
 Description: Shared layout with navigation, pastel-lavender theme,
-Bootstrap 5 CDN links, and footer. Includes Cart badge component.
+Bootstrap 5 CDN links, and footer.
+Includes Cart badge component.
 ---------------------------------------------------------------
 *@
 
@@ -12,19 +13,32 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>@ViewData["Title"] – BoBaTastic</title>
 
     <!-- Bootstrap 5 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+    <!-- Site CSS (your hero + custom styles) -->
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 
     <!-- Optional favicon -->
-    @* <link rel="icon" type="image/png" href="~/images/favicon.png"> *@
+    @* <link rel="icon" type="image/png" href="~/images/favicon.png" asp-append-version="true" /> *@
 
     <style>
+        :root {
+            --brand: #8B5CF6;
+            --surface: #F3E8FF;
+            --ink: #1F2937;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
         body {
-            background-color: #F3E8FF;
-            color: #1F2937;
+            background-color: var(--surface);
+            color: var(--ink);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             min-height: 100vh;
             display: flex;
@@ -32,11 +46,11 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
         }
 
         .navbar {
-            background-color: #8B5CF6;
+            background-color: var(--brand);
         }
 
         .navbar-brand, .nav-link {
-            color: white !important;
+            color: #fff !important;
             font-weight: 500;
         }
 
@@ -44,11 +58,29 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
                 color: #E0E7FF !important;
             }
 
+        /* Card defaults */
+        .card {
+            border: 0;
+            border-radius: 16px;
+            box-shadow: 0 10px 24px rgba(0,0,0,.08);
+            overflow: hidden;
+            background: #fff;
+        }
+
+        .card-img-top {
+            width: 100%;
+            aspect-ratio: 4/3;
+            object-fit: cover;
+            display: block;
+        }
+
         footer {
-            background-color: #8B5CF6;
-            color: white;
+            background-color: var(--brand);
+            color: #fff;
             padding: 1rem 0;
             margin-top: auto;
+            position: relative;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -57,7 +89,8 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">🧋 BoBaTastic</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                        aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
@@ -65,7 +98,10 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
                     <ul class="navbar-nav ms-auto align-items-lg-center">
                         <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
                         <li class="nav-item"><a class="nav-link" asp-controller="Products" asp-action="Index">Menu</a></li>
+
+                        @* Cart badge component *@
                         @await Component.InvokeAsync("CartBadge")
+
                         <li class="nav-item"><a class="nav-link" asp-controller="Rewards" asp-action="Index">Rewards</a></li>
                         <li class="nav-item"><a class="nav-link" asp-controller="Account" asp-action="Login">Login</a></li>
                     </ul>
@@ -74,12 +110,13 @@ Bootstrap 5 CDN links, and footer. Includes Cart badge component.
         </nav>
     </header>
 
+    <!-- IMPORTANT: exactly one RenderBody -->
     <main class="container py-4">
         @RenderBody()
     </main>
 
     <footer class="text-center">
-        <div class="container">
+        <div class="container position-relative">
             <small>© @DateTime.Now.Year BoBaTastic – All rights reserved.</small>
         </div>
     </footer>
