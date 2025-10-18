@@ -1,0 +1,48 @@
+﻿@model IEnumerable<BobaShop.Web.Models.ProductViewModel>
+
+@{
+    ViewData["Title"] = "Menu";
+}
+
+<div class="container py-4">
+    <h1 class="mb-3" style="color: var(--brand, #8B5CF6)">Our Drinks</h1>
+    <p class="text-muted mb-4">Explore our handcrafted bubble teas and fruit drinks.</p>
+
+    <div class="row g-4">
+        @foreach (var drink in Model)
+        {
+            <div class="col-6 col-md-4 col-lg-3">
+                <div class="card h-100 border-0 shadow-sm" style="background: var(--surface, #F3E8FF); border-radius: 1rem;">
+                    <a asp-controller="Products" asp-action="Details" asp-route-id="@drink.Id" class="text-decoration-none text-dark">
+                        <img src="@drink.ImageUrl"
+                             class="card-img-top p-3"
+                             alt="@drink.Name"
+                             style="height: 180px; object-fit: contain; border-top-left-radius: 1rem; border-top-right-radius: 1rem;" />
+                        <div class="card-body">
+                            <h5 class="card-title mb-1">@drink.Name</h5>
+                            <p class="text-muted small mb-2">@drink.Description</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="fw-semibold">@drink.Price.ToString("C2")</span>
+                                <button type="button" class="btn btn-sm btn-primary"
+                                        style="background: var(--brand, #8B5CF6); border: none; border-radius: .75rem;">
+                                    View
+                                </button>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // fallback if an image fails to load
+        document.querySelectorAll("img.card-img-top").forEach(img => {
+            img.addEventListener("error", () => {
+                img.src = "/images/drinks/placeholder.png";
+            });
+        });
+    </script>
+}
