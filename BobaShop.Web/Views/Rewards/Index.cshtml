@@ -2,58 +2,219 @@
     ViewData["Title"] = "Rewards";
 }
 
-<section class="container my-5">
-    <div class="text-center mb-4">
-        <span class="badge rounded-pill px-3 py-2" style="background:#E9D5FF;color:#6D28D9;">BoBaTastic Rewards</span>
-        <h1 class="fw-bold mt-3">Sip • Earn • Redeem</h1>
-        <p class="text-secondary">Earn <strong>10 pts</strong> per <strong>$10</strong>. Redeem <strong>100 pts</strong> for a free drink.</p>
-    </div>
-
-    <!-- Tiers -->
-    <div class="row g-4">
-        <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 rounded-4">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-2">How to Earn</h5>
-                    <ul class="m-0 small text-secondary">
-                        <li>Every $10 spent = 10 pts</li>
-                        <li>Double points on your birthday 🎉</li>
-                        <li>+5 pts for posting a product review</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 rounded-4">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-2">Redeem</h5>
-                    <ul class="m-0 small text-secondary">
-                        <li>100 pts = 1 free regular drink</li>
-                        <li>150 pts = free drink + 1 topping</li>
-                        <li>No expiry while your account is active</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-4">
-            <div class="card border-0 shadow-sm h-100 rounded-4">
-                <div class="card-body">
-                    <h5 class="fw-bold mb-2">Rules</h5>
-                    <ul class="m-0 small text-secondary">
-                        <li>Points post after order is completed</li>
-                        <li>Non-transferable, not cash-redeemable</li>
-                        <li>In-store & online orders both count</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- CTA -->
-    <div class="text-center mt-5">
-        <a asp-controller="Account" asp-action="Register" class="btn btn-dark btn-lg">Join Free</a>
-        <a asp-controller="Products" asp-action="Index" class="btn btn-outline-dark btn-lg ms-2">Shop & Earn</a>
+<section class="rewards-hero rounded-4 shadow-sm overflow-hidden mb-5">
+    <div class="rewards-hero-inner container py-5 text-center text-white">
+        <span class="badge bg-white text-brand fw-semibold px-3 py-2 rounded-pill">BoBaTastic Rewards</span>
+        <h1 class="display-5 fw-bold mt-3 mb-2">Sip • Earn • Redeem</h1>
+        <p class="mb-0 opacity-90">
+            Earn <strong>10 pts</strong> per <strong>$10</strong>. Redeem <strong>100 pts</strong> for a free drink.
+        </p>
     </div>
 </section>
+
+<div class="container">
+    <!-- Progress / Status row -->
+    <div class="row g-4 align-items-stretch mb-4">
+        <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <!-- Cup icon -->
+                        <div class="icon-circle me-3">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 3h10l-1 5h-8L7 3z" stroke="currentColor" stroke-width="1.5" /><path d="M8 8h8l-.8 8.5a3 3 0 0 1-3 2.5h-.4a3 3 0 0 1-3-2.5L8 8z" stroke="currentColor" stroke-width="1.5" /><circle cx="10" cy="16" r="1" fill="currentColor" /><circle cx="13" cy="17.5" r="1" fill="currentColor" /><circle cx="15.5" cy="15.5" r="1" fill="currentColor" /></svg>
+                        </div>
+                        <div>
+                            <h5 class="fw-bold mb-0">Your progress</h5>
+                            <small class="text-secondary">Demo display — dynamic balance coming next step</small>
+                        </div>
+                    </div>
+
+                    <!-- Fake progress for now (static demo) -->
+                    <div class="d-flex justify-content-between small text-secondary">
+                        <span>0 pts</span>
+                        <span>100 pts</span>
+                    </div>
+                    <div class="progress rounded-pill my-2" style="height:14px;">
+                        <div class="progress-bar bg-brand" role="progressbar" style="width: 45%;" aria-valuenow="45" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="fw-semibold">Current: <span class="text-brand">45 pts</span></span>
+                        <span class="fw-semibold">Need: <span class="text-brand">55 pts</span> for a free drink</span>
+                    </div>
+
+                    <div class="mt-3">
+                        <a asp-controller="Products" asp-action="Index" class="btn btn-dark me-2">Shop & Earn</a>
+                        <a asp-controller="Account" asp-action="Register" class="btn btn-outline-dark">Join Free</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Perks -->
+        <div class="col-12 col-lg-5">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-circle me-3">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.5L12 14.9 7.2 17l.9-5.5L4.2 7.7l5.4-.8L12 2z" stroke="currentColor" stroke-width="1.5" fill="none" /></svg>
+                        </div>
+                        <h5 class="fw-bold mb-0">Perks at a glance</h5>
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="chip">Birthday double points 🎉</span>
+                        <span class="chip">+5 pts per review</span>
+                        <span class="chip">Member-only flavours</span>
+                        <span class="chip">Early drop access</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="row g-4 mb-5">
+        <div class="col-12 col-md-4">
+            <div class="glass-card h-100">
+                <div class="glass-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5v14" stroke="currentColor" stroke-width="1.5" /></svg>
+                </div>
+                <h5 class="fw-bold mt-2 mb-1">Earn</h5>
+                <p class="text-secondary small mb-0">Every $10 spent = <strong>10 pts</strong>, in-store or online.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="glass-card h-100">
+                <div class="glass-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M7 12l3 3 7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+                </div>
+                <h5 class="fw-bold mt-2 mb-1">Track</h5>
+                <p class="text-secondary small mb-0">Your points appear after your order is completed.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="glass-card h-100">
+                <div class="glass-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M4 7h16v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
+                </div>
+                <h5 class="fw-bold mt-2 mb-1">Redeem</h5>
+                <p class="text-secondary small mb-0"><strong>100 pts</strong> = 1 free drink. <strong>150 pts</strong> = drink + topping.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQs -->
+    <div class="row">
+        <div class="col-12 col-lg-8 mx-auto">
+            <div class="card border-0 shadow-sm rounded-4">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold mb-3">FAQs</h5>
+                    <div class="accordion accordion-flush" id="rewardsFaq">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="q1">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a1">Do points expire?</button>
+                            </h2>
+                            <div id="a1" class="accordion-collapse collapse" data-bs-parent="#rewardsFaq">
+                                <div class="accordion-body small text-secondary">Points don’t expire while your account is active (an order or login within 12 months).</div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="q2">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a2">When are points added?</button>
+                            </h2>
+                            <div id="a2" class="accordion-collapse collapse" data-bs-parent="#rewardsFaq">
+                                <div class="accordion-body small text-secondary">Right after your order is completed and payment clears.</div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="q3">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a3">Can I transfer points?</button>
+                            </h2>
+                            <div id="a3" class="accordion-collapse collapse" data-bs-parent="#rewardsFaq">
+                                <div class="accordion-body small text-secondary">Points are non-transferable and not redeemable for cash.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a asp-controller="Account" asp-action="Register" class="btn btn-dark btn-lg">Join Free</a>
+                        <a asp-controller="Products" asp-action="Index" class="btn btn-outline-dark btn-lg ms-2">Shop & Earn</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    :root {
+        --brand: #8B5CF6; /* lavender */
+        --brand-ink: #4C1D95; /* darker lavender */
+        --surface: #F3E8FF; /* pale */
+    }
+
+    .text-brand {
+        color: var(--brand) !important;
+    }
+
+    .bg-brand {
+        background-color: var(--brand) !important;
+    }
+
+    .rewards-hero {
+        background: radial-gradient(1200px 400px at 20% -10%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 60%), linear-gradient(120deg, var(--brand) 0%, #A78BFA 35%, #C4B5FD 100%);
+    }
+
+    .rewards-hero-inner {
+        position: relative;
+    }
+
+    .rewards-hero .badge {
+        box-shadow: 0 6px 16px rgba(0,0,0,.15);
+    }
+
+    .rewards-hero .text-brand {
+        color: var(--brand-ink) !important;
+    }
+
+    .icon-circle {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: rgba(139,92,246,.12);
+        color: var(--brand-ink);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .chip {
+        display: inline-block;
+        font-size: .85rem;
+        background: #F5F3FF;
+        color: var(--brand-ink);
+        padding: .45rem .7rem;
+        border-radius: 999px;
+        border: 1px solid #EDE9FE;
+    }
+
+    .glass-card {
+        border-radius: 1rem;
+        padding: 1.2rem 1.2rem 1.1rem 1.2rem;
+        height: 100%;
+        background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.95));
+        border: 1px solid #eee;
+        box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    }
+
+    .glass-icon {
+        width: 46px;
+        height: 46px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #F3E8FF;
+        color: var(--brand-ink);
+    }
+</style>
