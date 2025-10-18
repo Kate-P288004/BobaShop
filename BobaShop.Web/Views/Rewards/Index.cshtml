@@ -1,0 +1,59 @@
+﻿@{
+    ViewData["Title"] = "Rewards";
+}
+
+<section class="container my-5">
+    <div class="text-center mb-4">
+        <span class="badge rounded-pill px-3 py-2" style="background:#E9D5FF;color:#6D28D9;">BoBaTastic Rewards</span>
+        <h1 class="fw-bold mt-3">Sip • Earn • Redeem</h1>
+        <p class="text-secondary">Earn <strong>10 pts</strong> per <strong>$10</strong>. Redeem <strong>100 pts</strong> for a free drink.</p>
+    </div>
+
+    <!-- Tiers -->
+    <div class="row g-4">
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">How to Earn</h5>
+                    <ul class="m-0 small text-secondary">
+                        <li>Every $10 spent = 10 pts</li>
+                        <li>Double points on your birthday 🎉</li>
+                        <li>+5 pts for posting a product review</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Redeem</h5>
+                    <ul class="m-0 small text-secondary">
+                        <li>100 pts = 1 free regular drink</li>
+                        <li>150 pts = free drink + 1 topping</li>
+                        <li>No expiry while your account is active</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <div class="card border-0 shadow-sm h-100 rounded-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Rules</h5>
+                    <ul class="m-0 small text-secondary">
+                        <li>Points post after order is completed</li>
+                        <li>Non-transferable, not cash-redeemable</li>
+                        <li>In-store & online orders both count</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center mt-5">
+        <a asp-controller="Account" asp-action="Register" class="btn btn-dark btn-lg">Join Free</a>
+        <a asp-controller="Products" asp-action="Index" class="btn btn-outline-dark btn-lg ms-2">Shop & Earn</a>
+    </div>
+</section>
