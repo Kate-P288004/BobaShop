@@ -1,33 +1,211 @@
 ﻿@{
     ViewData["Title"] = "Home";
 }
+@{
+    ViewData["Title"] = "Home";
+}
+@{
+    ViewData["Title"] = "Home";
+}
 
-<!-- HERO: Twisty-style (center panel + large side images) -->
-<section class="hero-twisty position-relative overflow-hidden rounded-4 shadow-sm">
-    <!-- Left drink -->
-    <img src="~/images/hero-left.jpg" asp-append-version="true"
-         alt="Matcha boba" class="hero-side hero-left d-none d-md-block" />
+@{
+    ViewData["Title"] = "Home";
+}
 
-    <!-- Right drink -->
-    <img src="~/images/hero-right.jpg" asp-append-version="true"
-         alt="Mango boba" class="hero-side hero-right d-none d-md-block" />
+<!-- HERO: Transparent Overlay with Text Inside -->
+<section class="hero-main position-relative overflow-hidden rounded-4 shadow-sm mb-5">
+    <img src="~/images/boba1.jpg" asp-append-version="true"
+         alt="BoBaTastic cafe interior" class="hero-main-img" />
 
-    <!-- Center content panel -->
-    <div class="container position-relative">
-        <div class="hero-panel mx-auto text-center">
-            <div class="hero-mark mb-3">
-                <img src="~/images/icon-bo.png" asp-append-version="true" alt="" class="hero-mark-icon" aria-hidden="true">
-                <span class="hero-mark-text">BoBaTastic</span>
+    <!-- Overlay text -->
+    <div class="hero-overlay d-flex flex-column justify-content-center align-items-center text-center">
+        <div class="hero-mark mb-3 d-flex align-items-center justify-content-center">
+            <img src="~/images/ico-bo.png" asp-append-version="true"
+                 alt="BoBaTastic logo" class="hero-mark-icon me-2 bg-white rounded-circle p-2 shadow" />
+            <span class="hero-mark-text fw-bold fs-5">BoBaTastic</span>
+        </div>
+
+
+        <h1 class="display-5 fw-bold text-white mb-3 text-shadow">Welcome to the<br />bubble tea world</h1>
+
+        <a asp-controller="Products" asp-action="Index"
+           class="btn btn-light btn-lg px-4">Shop Now</a>
+    </div>
+</section>
+
+
+<!-- FEATURED / POPULAR PICKS -->
+<section class="mt-5">
+    <div class="d-flex justify-content-between align-items-end mb-3">
+        <h2 class="fw-bold text-dark m-0">Popular Picks</h2>
+        <a asp-controller="Products" asp-action="Index" class="text-dark text-decoration-none">See all →</a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Card 1 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/brown-sugar-boba.jpg" class="card-img-top rounded-top" alt="Brown Sugar Boba" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Brown Sugar Boba</h5>
+                    <p class="card-text text-secondary small mb-3">Caramel swirls. Rich, creamy, iconic.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$7.00</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="2" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
             </div>
+        </div>
 
-            <h1 class="display-5 fw-bold mb-3">Welcome to the<br />bubble tea world</h1>
+        <!-- Card 2 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/taro-milk-tea.jpg" class="card-img-top rounded-top" alt="Taro Milk Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Taro Milk Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Velvety taro with a nutty finish.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.80</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="3" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <a asp-controller="Products" asp-action="Index" class="btn btn-dark btn-lg px-4" aria-label="Shop bubble tea now">
-                Shop Now
-            </a>
+        <!-- Card 3 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/mango-green-tea.jpg" class="card-img-top rounded-top" alt="Mango Green Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Mango Green Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Zesty, juicy, ultra-refreshing.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.20</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="4" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                <img src="/images/classic-milk-tea.jpg" class="card-img-top rounded-top" alt="Classic Milk Tea" />
+                <div class="card-body">
+                    <h5 class="card-title fw-semibold">Classic Milk Tea</h5>
+                    <p class="card-text text-secondary small mb-3">Smooth classic with tapioca pearls.</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">$6.50</span>
+                        <a asp-controller="Products" asp-action="Details" asp-route-id="1" class="btn btn-sm btn-outline-dark">Customize</a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </section>
+
+
+<!-- VALUE PROPS -->
+<section class="mt-5">
+    <div class="row g-3">
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Tailor Every Sip</h6>
+                <p class="text-secondary mb-0 small">Size, sugar, ice, toppings — fully customizable in a couple of taps.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Fresh Daily</h6>
+                <p class="text-secondary mb-0 small">Brewed teas and pearls cooked fresh throughout the day.</p>
+            </div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="p-4 bg-white rounded-4 shadow-sm h-100">
+                <h6 class="fw-bold mb-1">Rewards that Add Up</h6>
+                <p class="text-secondary mb-0 small">Earn 10 pts per $10. Redeem 100 pts for a free drink.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+<!-- CTA STRIP -->
+<section class="mt-5 mb-2 p-4 p-md-5 rounded-4 text-center shadow-sm" style="background-color:#8B5CF6;">
+    <h3 class="fw-bold text-white mb-2">Ready for your BoBa moment?</h3>
+    <p class="text-white-50 mb-4">Pick a flavour, tweak the sweetness, choose the crunch. It’s all you.</p>
+    <a asp-controller="Products" asp-action="Index" class="btn btn-light btn-lg">Order Now</a>
+</section>
+
+<!-- STYLES -->
+<style>
+    .hero-main {
+        position: relative;
+        width: 100%;
+        height: 75vh;
+        border-radius: 1rem;
+        overflow: hidden;
+        background-color: #F3E8FF;
+    }
+
+    .hero-main-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        filter: brightness(65%);
+    }
+
+    .hero-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient( to bottom, rgba(139, 92, 246, 0.25) 0%, rgba(0, 0, 0, 0.35) 100% );
+        color: white;
+        padding: 2rem;
+    }
+
+    .text-shadow {
+        text-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .hero-mark-icon {
+        width: 60px;
+        height: 60px;
+        object-fit: contain;
+        border: 2px solid rgba(255, 255, 255, 0.6);
+    }
+
+    .hero-mark-text {
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+    }
+
+    .card-img-top {
+        object-fit: cover;
+        height: 180px;
+        border-top-left-radius: 1rem;
+        border-top-right-radius: 1rem;
+    }
+
+    .hero-mark-text {
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+        color: #8B5CF6; /* brand lavender purple */
+        background-color: #fff;
+        padding: 0.4rem 0.8rem;
+        border-radius: 1rem;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+    }
+
+
+
+
+</style>
+
+
 
 
 <!-- FEATURED / POPULAR PICKS -->

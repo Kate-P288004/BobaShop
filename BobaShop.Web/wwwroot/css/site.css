@@ -77,3 +77,76 @@ body { margin-bottom: 60px; }
   .hero-side { display: none !important; } /* hide big photos on phones */
   .hero-panel { margin: 1.25rem auto; }
 }
+
+/* --- Twisty-style hero final fix --- */
+.hero-twisty {
+  background: linear-gradient(180deg, #E9D5FF 0%, #F3E8FF 65%, #F5F3FF 100%);
+  min-height: 56vh;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+/* cups on sides */
+.hero-side {
+  position: absolute;
+  bottom: 0;
+  width: 42vw;
+  max-width: 550px;
+  object-fit: cover;
+  filter: drop-shadow(0 18px 30px rgba(0,0,0,0.18));
+  user-select: none;
+  pointer-events: none;
+  animation: floatY 6s ease-in-out infinite;
+  z-index: 1;
+}
+.hero-left  { left: -3vw; transform: translateY(8px); }
+.hero-right { right: -3vw; transform: translateY(8px); }
+
+@keyframes floatY {
+  0%,100% { transform: translateY(8px); }
+  50%     { transform: translateY(-6px); }
+}
+
+/* center white panel */
+.hero-panel {
+  position: relative;
+  z-index: 2;
+  background: #fff;
+  padding: clamp(1.5rem, 3vw, 2.5rem) clamp(1.5rem, 4vw, 3rem);
+  border-radius: 2rem;
+  box-shadow: 0 10px 35px rgba(0,0,0,0.1);
+  max-width: 700px;
+}
+
+/* logo chip */
+.hero-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .45rem .9rem;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0,0,0,.1);
+  border: 1px solid rgba(0,0,0,.05);
+}
+.hero-mark-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.hero-mark-text {
+  font-weight: 600;
+  color: #6B21A8;
+  font-size: 0.95rem;
+}
+
+/* phones */
+@media (max-width: 768px) {
+  .hero-side { display: none !important; }
+  .hero-twisty { padding: 1.5rem 1rem; }
+  .hero-panel { max-width: 90%; border-radius: 1.25rem; }
+}
+
