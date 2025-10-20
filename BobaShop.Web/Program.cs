@@ -1,90 +1,102 @@
-// Program.cs — BobaShop.Web
+// ---------------------------------------------------------------
+// Program.cs (BobaShop.Web) - Identity + Cookie auth
+// .NET 9 minimal hosting style
+// ---------------------------------------------------------------
 using BobaShop.Web.Data;
-using BobaShop.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using System;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ------------------------------------------------------------
-// Services
-// ------------------------------------------------------------
+// DB for Identity (SQLite)
+builder.Services.AddDbContext<ApplicationDbContext>(opts =>
+    opts.UseSqlite(builder.Configuration.GetConnectionString("IdentityDb")));
 
-// MVC + Razor Pages (Identity UI uses Razor Pages)
-builder.Services.AddControllersWithViews();
-builder.Services.AddRazorPages();
-
-// EF Core (SQLite) for Identity
-// "ConnectionStrings": { "DefaultConnection": "Data Source=app_identity.db" }
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// ASP.NET Core Identity (with UI)
-builder.Services.AddDefaultIdentity<ApplicationUser>(options =>
+// Identity
+builder.Services.AddIdentity<IdentityUser, IdentityRole>(opts =>
 {
-    options.SignIn.RequireConfirmedAccount = false; // ok for assessment
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequireUppercase = false;
-    options.Password.RequiredLength = 6;
+    // Relax a bit but still aligned to NIST-ish guidance
+    opts.Password.RequireDigit = true;
+    opts.Password.RequireUppercase = false;
+    opts.Password.RequireLowercase = true;
+    opts.Password.RequireNonAlphanumeric = false;
+    opts.Password.RequiredLength = 8;
+    opts.User.RequireUniqueEmail = true;
 })
-.AddEntityFrameworkStores<ApplicationDbContext>();
+.AddEntityFrameworkStores<ApplicationDbContext>()
+.AddDefaultTokenProviders();
 
-// Identity cookie paths
-builder.Services.ConfigureApplicationCookie(options =>
+builder.Services.ConfigureApplicationCookie(o =>
 {
-    options.LoginPath = "/Identity/Account/Login";
-    options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+    o.LoginPath = "/Account/Login";
+    o.LogoutPath = "/Account/Logout";
+    o.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-// Typed HttpClient for your API calls
-// "ApiBaseUrl": "https://localhost:5001/"
-builder.Services.AddHttpClient<ApiService>(client =>
-{
-    var baseUrl = builder.Configuration["ApiBaseUrl"];
-    if (string.IsNullOrWhiteSpace(baseUrl))
-        throw new InvalidOperationException("ApiBaseUrl is not configured in appsettings.json.");
-    client.BaseAddress = new Uri(baseUrl);
-});
+// MVC
+builder.Services.AddControllersWithViews();
 
-// -------------------- Cart (Session + Service) --------------------
-builder.Services.AddSession(opts =>
-{
-    opts.IdleTimeout = TimeSpan.FromHours(2);
-    opts.Cookie.HttpOnly = true;
-    opts.Cookie.IsEssential = true;
-});
-builder.Services.AddHttpContextAccessor();
-builder.Services.AddScoped<ICartService, CartService>();
-// ---------------------------------------------------------------
+// Admin/Role seeding
+builder.Services.AddScoped<IdentitySeeder>();
 
 var app = builder.Build();
 
-// ------------------------------------------------------------
-// Middleware pipeline
-// ------------------------------------------------------------
-if (!app.Environment.IsDevelopment())
+// Migrate / create Identity DB automatically (dev convenience)
+using (var scope = app.Services.CreateScope())
 {
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await db.Database.MigrateAsync();
+
+    // Seed Admin + roles
+    var seeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
+    await seeder.SeedAsync(
+        app.Configuration["AdminSeed:Email"]!,
+        app.Configuration["AdminSeed:Password"]!,
+        app.Configuration["AdminSeed:Role"]!
+    );
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
 
-app.UseAuthentication();
+app.UseAuthentication();   // <-- IMPORTANT
 app.UseAuthorization();
 
-app.UseSession(); // session BEFORE endpoints
-
-// MVC default route
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// Identity UI endpoints (Login/Register/Logout)
-app.MapRazorPages();
-
 app.Run();
+
+// ---------------------------------------------------------------
+// Local seeder service
+// ---------------------------------------------------------------
+public class IdentitySeeder
+{
+    private readonly RoleManager<IdentityRole> _roles;
+    private readonly UserManager<IdentityUser> _users;
+    public IdentitySeeder(RoleManager<IdentityRole> roles, UserManager<IdentityUser> users)
+    {
+        _roles = roles; _users = users;
+    }
+
+    public async Task SeedAsync(string adminEmail, string adminPassword, string adminRole)
+    {
+        // Create roles
+        var roles = new[] { "Admin", "Customer" };
+        foreach (var r in roles)
+            if (!await _roles.RoleExistsAsync(r))
+                await _roles.CreateAsync(new IdentityRole(r));
+
+        // Create admin user
+        var admin = await _users.FindByEmailAsync(adminEmail);
+        if (admin is null)
+        {
+            admin = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+            var result = await _users.CreateAsync(admin, adminPassword);
+            if (result.Succeeded)
+                await _users.AddToRoleAsync(admin, adminRole);
+        }
+    }
+}
