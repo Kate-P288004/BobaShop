@@ -1,24 +1,30 @@
 // ---------------------------------------------------------------
-// Program.cs (BobaShop.Web) - Identity + Cookie auth
-// .NET 9 minimal hosting style
+// File: Program.cs
+// Student: Kate Odabas (P288004)
+// Project: BoBaTastic – Web (.NET 9)
+// Purpose: Identity + Cookie Auth + Session-backed Cart + Seeding
 // ---------------------------------------------------------------
 using BobaShop.Web.Data;
+using BobaShop.Web.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DB for Identity (SQLite)
+// ---------------------------------------------------------------
+// 1) DATABASE (SQLite for Identity)
+// ---------------------------------------------------------------
 builder.Services.AddDbContext<ApplicationDbContext>(opts =>
     opts.UseSqlite(builder.Configuration.GetConnectionString("IdentityDb")));
 
-// Identity
+// ---------------------------------------------------------------
+// 2) IDENTITY (Cookie auth)
+// ---------------------------------------------------------------
 builder.Services.AddIdentity<IdentityUser, IdentityRole>(opts =>
 {
-    // Relax a bit but still aligned to NIST-ish guidance
     opts.Password.RequireDigit = true;
-    opts.Password.RequireUppercase = false;
     opts.Password.RequireLowercase = true;
+    opts.Password.RequireUppercase = false;
     opts.Password.RequireNonAlphanumeric = false;
     opts.Password.RequiredLength = 8;
     opts.User.RequireUniqueEmail = true;
@@ -33,34 +39,58 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-// MVC
+// ---------------------------------------------------------------
+// 3) MVC
+// ---------------------------------------------------------------
 builder.Services.AddControllersWithViews();
 
-// Admin/Role seeding
+// ---------------------------------------------------------------
+// 4) SESSION + CART SERVICE (for CartBadge VC)
+// ---------------------------------------------------------------
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+});
+
+builder.Services.AddScoped<ICartService, CartService>();
+
+// ---------------------------------------------------------------
+// 5) SEEDER
+// ---------------------------------------------------------------
 builder.Services.AddScoped<IdentitySeeder>();
 
 var app = builder.Build();
 
-// Migrate / create Identity DB automatically (dev convenience)
+// ---------------------------------------------------------------
+// 6) APPLY MIGRATIONS + SEED ROLES/ADMIN
+// ---------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     await db.Database.MigrateAsync();
 
-    // Seed Admin + roles
     var seeder = scope.ServiceProvider.GetRequiredService<IdentitySeeder>();
     await seeder.SeedAsync(
-        app.Configuration["AdminSeed:Email"]!,
-        app.Configuration["AdminSeed:Password"]!,
-        app.Configuration["AdminSeed:Role"]!
+        app.Configuration["AdminSeed:Email"] ?? "admin@bobatastic.local",
+        app.Configuration["AdminSeed:Password"] ?? "Admin!23456",
+        app.Configuration["AdminSeed:Role"] ?? "Admin"
     );
 }
 
+// ---------------------------------------------------------------
+// 7) PIPELINE
+// ---------------------------------------------------------------
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 
-app.UseAuthentication();   // <-- IMPORTANT
+// Session MUST be before MVC endpoints and after routing
+app.UseSession();
+
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
@@ -70,33 +100,44 @@ app.MapControllerRoute(
 app.Run();
 
 // ---------------------------------------------------------------
-// Local seeder service
+// Seeder class (kept here for convenience)
 // ---------------------------------------------------------------
 public class IdentitySeeder
 {
     private readonly RoleManager<IdentityRole> _roles;
     private readonly UserManager<IdentityUser> _users;
+
     public IdentitySeeder(RoleManager<IdentityRole> roles, UserManager<IdentityUser> users)
     {
-        _roles = roles; _users = users;
+        _roles = roles;
+        _users = users;
     }
 
     public async Task SeedAsync(string adminEmail, string adminPassword, string adminRole)
     {
-        // Create roles
+        // Roles
         var roles = new[] { "Admin", "Customer" };
         foreach (var r in roles)
+        {
             if (!await _roles.RoleExistsAsync(r))
                 await _roles.CreateAsync(new IdentityRole(r));
+        }
 
-        // Create admin user
+        // Admin user
         var admin = await _users.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
-            admin = new IdentityUser { UserName = adminEmail, Email = adminEmail, EmailConfirmed = true };
+            admin = new IdentityUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true
+            };
             var result = await _users.CreateAsync(admin, adminPassword);
             if (result.Succeeded)
+            {
                 await _users.AddToRoleAsync(admin, adminRole);
+            }
         }
     }
 }
