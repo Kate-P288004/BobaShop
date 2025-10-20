@@ -1,165 +1,112 @@
-﻿@model BobaShop.Web.Models.ProductDetailsViewModel
+﻿@model BobaShop.Web.Models.ProductViewModel
 @{
-    ViewData["Title"] = Model.Name;
+    ViewData["Title"] = @Model.Name;
 }
 
-<div class="row g-4">
-    <!-- Left: Product Image -->
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm">
-            <img src="@Model.ImageUrl" class="card-img-top rounded-top" alt="@Model.Name" />
+<div class="container py-4">
+    <div class="row g-4 align-items-center">
+        <!-- Left side: product image -->
+        <div class="col-md-5 text-center">
+            <img src="@Model.ImageUrl"
+                 alt="@Model.Name"
+                 class="img-fluid shadow-sm"
+                 style="max-height: 350px; border-radius: 1rem; background: var(--surface, #F3E8FF);" />
         </div>
-    </div>
 
-    <!-- Right: Customisation + Add to Cart -->
-    <div class="col-12 col-lg-6">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body">
-                <h2 class="fw-bold">@Model.Name</h2>
-                <div class="text-muted mb-2">Customize your drink</div>
+        <!-- Right side: product details -->
+        <div class="col-md-7">
+            <h2 class="fw-bold" style="color: var(--brand, #8B5CF6);">@Model.Name</h2>
+            <p class="text-muted">@Model.Description</p>
+            <h4 class="fw-semibold mb-3">@Model.Price.ToString("C2")</h4>
 
-                <!-- Size -->
+            <form asp-controller="Cart" asp-action="Add" method="post" class="p-3 rounded shadow-sm" style="background: var(--surface, #F3E8FF);">
+                @Html.AntiForgeryToken()
+
+                <!-- Hidden fields -->
+                <input type="hidden" name="ProductId" value="@Model.Id" />
+                <input type="hidden" name="Name" value="@Model.Name" />
+                <input type="hidden" name="UnitPrice" value="@Model.Price" />
+
+                <!-- Size selection -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Size</label>
-                    <div class="d-flex gap-2">
-                        <input type="radio" class="btn-check" name="size" id="sizeS" value="S" checked>
-                        <label class="btn btn-outline-dark btn-sm" for="sizeS">Small</label>
+                    <select class="form-select" name="Size" required>
+                        <option value="Regular">Regular</option>
+                        <option value="Large">Large (+$1.00)</option>
+                    </select>
+                </div>
 
-                        <input type="radio" class="btn-check" name="size" id="sizeM" value="M">
-                        <label class="btn btn-outline-dark btn-sm" for="sizeM">Medium (+$0.70)</label>
-
-                        <input type="radio" class="btn-check" name="size" id="sizeL" value="L">
-                        <label class="btn btn-outline-dark btn-sm" for="sizeL">Large (+$1.20)</label>
+                <!-- Sugar & Ice sliders -->
+                <div class="row mb-3">
+                    <div class="col">
+                        <label class="form-label fw-semibold">Sugar</label>
+                        <select class="form-select" name="Sugar" required>
+                            <option value="0">0%</option>
+                            <option value="25">25%</option>
+                            <option value="50" selected>50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                        </select>
                     </div>
-                </div>
-
-                <!-- Sugar -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Sugar: <span id="sugarLabel">100%</span></label>
-                    <input type="range" class="form-range" min="0" max="100" step="25" id="sugar" value="100">
-                </div>
-
-                <!-- Ice -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Ice: <span id="iceLabel">100%</span></label>
-                    <input type="range" class="form-range" min="0" max="100" step="25" id="ice" value="100">
+                    <div class="col">
+                        <label class="form-label fw-semibold">Ice</label>
+                        <select class="form-select" name="Ice" required>
+                            <option value="0">0%</option>
+                            <option value="25">25%</option>
+                            <option value="50" selected>50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Toppings -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Toppings</label>
-                    <div class="row">
-                        @for (var i = 0; i < Model.Toppings.Count; i++)
-                        {
-                            var t = Model.Toppings[i];
-                            <div class="col-12 col-sm-6 mb-2">
-                                <div class="form-check">
-                                    <input class="form-check-input topping" type="checkbox"
-                                           name="toppings" value="@t.Code" data-price="@t.Price" id="tp-@t.Code">
-                                    <label class="form-check-label" for="tp-@t.Code">
-                                        @t.Name <span class="text-muted">(+@t.Price.ToString("C2"))</span>
-                                    </label>
-                                </div>
-                            </div>
-                        }
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="ToppingsSummary" value="Pearls" id="tPearls" />
+                        <label class="form-check-label" for="tPearls">Pearls</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="ToppingsSummary" value="Coconut Jelly" id="tCoconut" />
+                        <label class="form-check-label" for="tCoconut">Coconut Jelly</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="ToppingsSummary" value="Pudding" id="tPudding" />
+                        <label class="form-check-label" for="tPudding">Pudding</label>
                     </div>
                 </div>
 
-                <!-- Add to Cart Form -->
-                <form asp-controller="Cart" asp-action="Add" method="post" class="d-flex align-items-center justify-content-between mt-4">
-                    @Html.AntiForgeryToken()
+                <!-- Quantity -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Quantity</label>
+                    <input type="number" name="Quantity" value="1" min="1" class="form-control" style="max-width: 100px;" />
+                </div>
 
-                    <!-- Hidden fields -->
-                    <input type="hidden" name="ProductId" value="@Model.Id" />
-                    <input type="hidden" name="Name" value="@Model.Name" />
-                    <input type="hidden" name="ImageUrl" value="@Model.ImageUrl" />
-                    <input type="hidden" name="Size" id="formSize" value="S" />
-                    <input type="hidden" name="Sugar" id="formSugar" value="100" />
-                    <input type="hidden" name="Ice" id="formIce" value="100" />
-                    <input type="hidden" name="ToppingsSummary" id="formToppings" value="" />
-                    <input type="hidden" name="UnitPrice" id="formPrice" value="@Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
-                    <input type="hidden" name="Quantity" value="1" />
-
-                    <div>
-                        <div class="text-muted small">Estimated total</div>
-                        <div class="h4 mb-0" id="priceTotal">@Model.BasePrice.ToString("C2")</div>
-                    </div>
-                    <button class="btn btn-dark btn-lg" type="submit">Add to Cart</button>
-                </form>
-
-                <div class="form-text mt-2">Price updates as you change size or toppings.</div>
-            </div>
+                <!-- Buttons -->
+                <div class="d-flex gap-2">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            style="background: var(--brand, #8B5CF6); border: none; border-radius: .75rem;">
+                        Add to Cart
+                    </button>
+                    <a asp-controller="Products"
+                       asp-action="Index"
+                       class="btn btn-outline-secondary"
+                       style="border-radius: .75rem;">
+                        Back to Menu
+                    </a>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 @section Scripts {
     <script>
-        (function () {
-            const basePrice = parseFloat('@Model.BasePrice.ToString(System.Globalization.CultureInfo.InvariantCulture)');
-            const priceEl = document.getElementById('priceTotal');
-            const sizeRadios = document.querySelectorAll('input[name="size"]');
-            const toppings = document.querySelectorAll('.topping');
-            const sugar = document.getElementById('sugar');
-            const ice = document.getElementById('ice');
-
-            const sugarLabel = document.getElementById('sugarLabel');
-            const iceLabel = document.getElementById('iceLabel');
-
-            const formSize = document.getElementById('formSize');
-            const formSugar = document.getElementById('formSugar');
-            const formIce = document.getElementById('formIce');
-            const formToppings = document.getElementById('formToppings');
-            const formPrice = document.getElementById('formPrice');
-
-            function sizeUpcharge() {
-                const v = document.querySelector('input[name="size"]:checked').value;
-                if (v === 'M') return 0.70;
-                if (v === 'L') return 1.20;
-                return 0.0;
-            }
-
-            function toppingsTotal() {
-                let sum = 0;
-                const names = [];
-                toppings.forEach(cb => {
-                    if (cb.checked) {
-                        const p = parseFloat(cb.dataset.price);
-                        sum += p;
-                        names.push(cb.labels[0].innerText.trim());
-                    }
-                });
-                formToppings.value = names.join(", ");
-                return sum;
-            }
-
-            function formatCurrency(num) {
-                return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'AUD' }).format(num);
-            }
-
-            function updatePrice() {
-                const total = basePrice + sizeUpcharge() + toppingsTotal();
-                priceEl.textContent = formatCurrency(total);
-                formPrice.value = total.toFixed(2);
-            }
-
-            // sync hidden fields
-            sizeRadios.forEach(r => r.addEventListener('change', () => {
-                formSize.value = r.value;
-                updatePrice();
-            }));
-
-            sugar.addEventListener('input', e => {
-                sugarLabel.textContent = e.target.value + '%';
-                formSugar.value = e.target.value;
-            });
-            ice.addEventListener('input', e => {
-                iceLabel.textContent = e.target.value + '%';
-                formIce.value = e.target.value;
-            });
-            toppings.forEach(t => t.addEventListener('change', updatePrice));
-
-            updatePrice();
-        })();
+        // fallback if image fails
+        document.querySelectorAll("img").forEach(img => {
+            img.addEventListener("error", () => img.src = "/images/drinks/placeholder.png");
+        });
     </script>
 }
