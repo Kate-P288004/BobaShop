@@ -8,15 +8,19 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using BobaShop.Web.Data;    // 👈 Our custom ApplicationUser lives here
 
 namespace BobaShop.Web.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly UserManager<IdentityUser> _users;
-        private readonly SignInManager<IdentityUser> _signIn;
+        // 👇 Use ApplicationUser, not IdentityUser
+        private readonly UserManager<ApplicationUser> _users;
+        private readonly SignInManager<ApplicationUser> _signIn;
 
-        public AccountController(UserManager<IdentityUser> users, SignInManager<IdentityUser> signIn)
+        public AccountController(
+            UserManager<ApplicationUser> users,
+            SignInManager<ApplicationUser> signIn)
         {
             _users = users;
             _signIn = signIn;
@@ -24,15 +28,26 @@ namespace BobaShop.Web.Controllers
 
         // ---------- Register ----------
         [HttpGet]
+        [AllowAnonymous]
         public IActionResult Register() => View(new RegisterVm());
 
         [HttpPost]
+        [AllowAnonymous]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Register(RegisterVm vm)
         {
             if (!ModelState.IsValid) return View(vm);
 
-            var user = new IdentityUser { UserName = vm.Email, Email = vm.Email, EmailConfirmed = true };
+            // 👇 Create your custom user type
+            var user = new ApplicationUser
+            {
+                UserName = vm.Email,
+                Email = vm.Email,
+                EmailConfirmed = true,   // keep simple
+                RewardPoints = 0         // start at zero
+                // FullName = vm.FullName // add this if you later extend the VM
+            };
+
             var result = await _users.CreateAsync(user, vm.Password);
 
             if (result.Succeeded)
@@ -51,15 +66,21 @@ namespace BobaShop.Web.Controllers
 
         // ---------- Login ----------
         [HttpGet]
-        public IActionResult Login(string? returnUrl = null) => View(new LoginVm { ReturnUrl = returnUrl });
+        [AllowAnonymous]
+        public IActionResult Login(string? returnUrl = null)
+            => View(new LoginVm { ReturnUrl = returnUrl });
 
         [HttpPost]
+        [AllowAnonymous]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginVm vm)
         {
             if (!ModelState.IsValid) return View(vm);
 
-            var result = await _signIn.PasswordSignInAsync(vm.Email, vm.Password, vm.RememberMe, lockoutOnFailure: true);
+            // Using email as username, since we set UserName = Email at registration
+            var result = await _signIn.PasswordSignInAsync(
+                vm.Email, vm.Password, vm.RememberMe, lockoutOnFailure: true);
+
             if (result.Succeeded)
             {
                 if (!string.IsNullOrWhiteSpace(vm.ReturnUrl) && Url.IsLocalUrl(vm.ReturnUrl))
@@ -90,6 +111,7 @@ namespace BobaShop.Web.Controllers
             [Required, EmailAddress] public string Email { get; set; } = "";
             [Required, DataType(DataType.Password)] public string Password { get; set; } = "";
             [Required, DataType(DataType.Password), Compare(nameof(Password))] public string ConfirmPassword { get; set; } = "";
+            // public string? FullName { get; set; }   // uncomment if you want to collect
         }
 
         public class LoginVm
