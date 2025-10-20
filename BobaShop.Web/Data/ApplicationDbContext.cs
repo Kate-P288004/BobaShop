@@ -9,7 +9,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BobaShop.Web.Data
 {
-    public class ApplicationDbContext : IdentityDbContext
+    // IMPORTANT: Inherit from IdentityDbContext<ApplicationUser>
+    public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options) { }

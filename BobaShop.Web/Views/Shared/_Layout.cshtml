@@ -5,9 +5,13 @@ Student: Kate Odabas (P288004)
 Project: BoBaTastic – Web UI Base Layout
 Description: Shared layout with navigation, pastel-lavender theme,
 Bootstrap 5 CDN links, and footer.
-Includes Cart badge component.
+Includes Cart badge component and auth-aware navbar.
 ---------------------------------------------------------------
 *@
+@using Microsoft.AspNetCore.Identity
+@using BobaShop.Web.Data
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
 
 <!DOCTYPE html>
 <html lang="en">
@@ -54,9 +58,9 @@ Includes Cart badge component.
             font-weight: 500;
         }
 
-            .nav-link:hover {
-                color: #E0E7FF !important;
-            }
+        .nav-link:hover {
+            color: #E0E7FF !important;
+        }
 
         /* Card defaults */
         .card {
@@ -89,32 +93,66 @@ Includes Cart badge component.
         <nav class="navbar navbar-expand-lg navbar-dark">
             <div class="container">
                 <a class="navbar-brand" asp-controller="Home" asp-action="Index">🧋 BoBaTastic</a>
+
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
                 <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto align-items-lg-center">
-                        <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Home</a></li>
-                        <li class="nav-item"><a class="nav-link" asp-controller="Products" asp-action="Index">Menu</a></li>
+                    <!-- LEFT side links -->
+                    <ul class="navbar-nav me-auto align-items-lg-center">
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Home" asp-action="Index">Home</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-controller="Products" asp-action="Index">Menu</a>
+                        </li>
 
                         @* Cart badge component *@
                         @await Component.InvokeAsync("CartBadge")
 
-                        <li class="nav-item"><a class="nav-link" asp-controller="Rewards" asp-action="Index">Rewards</a></li>
-                        <li class="nav-item"><a class="nav-link" asp-controller="Account" asp-action="Login">Login</a></li>
                         <li class="nav-item">
-                           
+                            <a class="nav-link" asp-controller="Rewards" asp-action="Index">Rewards</a>
                         </li>
 
+                        @* Admin link (only visible for Admins) *@
+                        @if (SignInManager.IsSignedIn(User) && User.IsInRole("Admin"))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-controller="Admin" asp-action="Index">Admin</a>
+                            </li>
+                        }
+                    </ul>
+
+                    <!-- RIGHT side auth block -->
+                    <ul class="navbar-nav ms-auto align-items-lg-center">
+                        @if (SignInManager.IsSignedIn(User))
+                        {
+                            var me = await UserManager.GetUserAsync(User);
+
+                            <li class="nav-item me-2">
+                                <span class="badge rounded-pill text-bg-light">
+                                    Rewards: @me?.RewardPoints
+                                </span>
+                            </li>
+                            <li class="nav-item">
+                                <span class="navbar-text me-2">Hi, @User.Identity?.Name</span>
+                            </li>
+                            <li class="nav-item">
+                                <form class="d-inline" asp-controller="Account" asp-action="Logout" method="post">
+                                    <button class="btn btn-outline-light btn-sm">Logout</button>
+                                </form>
+                            </li>
+                        
+                        }
                     </ul>
                 </div>
             </div>
         </nav>
     </header>
 
-    <!-- IMPORTANT: exactly one RenderBody -->
+    <!-- MAIN BODY -->
     <main class="container py-4">
         @RenderBody()
     </main>

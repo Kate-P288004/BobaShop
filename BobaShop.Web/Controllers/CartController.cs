@@ -30,6 +30,16 @@ namespace BobaShop.Web.Controllers
         }
 
         // -----------------------------------------------------------
+        // GET: /Cart/Add  (friendly fallback to avoid 405 on direct URL)
+        // -----------------------------------------------------------
+        [HttpGet]
+        public IActionResult Add()
+        {
+            TempData["CartMessage"] = "Use the product page to add items to your cart.";
+            return RedirectToAction("Index", "Products");
+        }
+
+        // -----------------------------------------------------------
         // POST: /Cart/Add
         // Add an item (from product details form)
         // -----------------------------------------------------------

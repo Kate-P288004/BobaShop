@@ -18,19 +18,20 @@ builder.Services.AddDbContext<ApplicationDbContext>(opts =>
     opts.UseSqlite(builder.Configuration.GetConnectionString("IdentityDb")));
 
 // ---------------------------------------------------------------
-// 2) IDENTITY (Cookie auth)
+// 2) IDENTITY (use our ApplicationUser + Roles)
 // ---------------------------------------------------------------
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(opts =>
-{
-    opts.Password.RequireDigit = true;
-    opts.Password.RequireLowercase = true;
-    opts.Password.RequireUppercase = false;
-    opts.Password.RequireNonAlphanumeric = false;
-    opts.Password.RequiredLength = 8;
-    opts.User.RequireUniqueEmail = true;
-})
-.AddEntityFrameworkStores<ApplicationDbContext>()
-.AddDefaultTokenProviders();
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole>(opts =>
+    {
+        opts.Password.RequireDigit = true;
+        opts.Password.RequireLowercase = true;
+        opts.Password.RequireUppercase = false;
+        opts.Password.RequireNonAlphanumeric = false;
+        opts.Password.RequiredLength = 8;
+        opts.User.RequireUniqueEmail = true;
+    })
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders();
 
 builder.Services.ConfigureApplicationCookie(o =>
 {
@@ -57,14 +58,19 @@ builder.Services.AddSession(options =>
 builder.Services.AddScoped<ICartService, CartService>();
 
 // ---------------------------------------------------------------
-// 5) SEEDER
+// 5) REWARDS SERVICE (earn/redeem points)
+// ---------------------------------------------------------------
+builder.Services.AddScoped<IRewardsService, RewardsService>();
+
+// ---------------------------------------------------------------
+// 6) SEEDER
 // ---------------------------------------------------------------
 builder.Services.AddScoped<IdentitySeeder>();
 
 var app = builder.Build();
 
 // ---------------------------------------------------------------
-// 6) APPLY MIGRATIONS + SEED ROLES/ADMIN
+// 7) APPLY MIGRATIONS + SEED ROLES/ADMIN
 // ---------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
@@ -80,7 +86,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ---------------------------------------------------------------
-// 7) PIPELINE
+// 8) PIPELINE
 // ---------------------------------------------------------------
 app.UseHttpsRedirection();
 app.UseStaticFiles();
@@ -105,9 +111,9 @@ app.Run();
 public class IdentitySeeder
 {
     private readonly RoleManager<IdentityRole> _roles;
-    private readonly UserManager<IdentityUser> _users;
+    private readonly UserManager<ApplicationUser> _users;
 
-    public IdentitySeeder(RoleManager<IdentityRole> roles, UserManager<IdentityUser> users)
+    public IdentitySeeder(RoleManager<IdentityRole> roles, UserManager<ApplicationUser> users)
     {
         _roles = roles;
         _users = users;
@@ -127,12 +133,15 @@ public class IdentitySeeder
         var admin = await _users.FindByEmailAsync(adminEmail);
         if (admin is null)
         {
-            admin = new IdentityUser
+            admin = new ApplicationUser
             {
                 UserName = adminEmail,
                 Email = adminEmail,
-                EmailConfirmed = true
+                EmailConfirmed = true,
+                FullName = "Site Administrator",
+                RewardPoints = 0
             };
+
             var result = await _users.CreateAsync(admin, adminPassword);
             if (result.Succeeded)
             {
