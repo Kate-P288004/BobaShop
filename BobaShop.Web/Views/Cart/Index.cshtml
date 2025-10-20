@@ -1,13 +1,17 @@
 ﻿@model BobaShop.Web.Models.CartViewModel
 @{
     ViewData["Title"] = "Cart";
+    // UnitPrice is double => use double math here
+    double total = Model?.Items?.Sum(i => i.UnitPrice * i.Quantity) ?? 0.0;
 }
 
 <h2 class="fw-bold mb-3">Your Cart</h2>
 
-@if (!Model.Items.Any())
+@if (Model?.Items == null || !Model.Items.Any())
 {
-    <div class="alert alert-light border">Your cart is empty. <a asp-controller="Products" asp-action="Index">Browse drinks</a>.</div>
+    <div class="alert alert-light border">
+        Your cart is empty. <a asp-controller="Products" asp-action="Index">Browse drinks</a>.
+    </div>
 }
 else
 {
@@ -26,10 +30,11 @@ else
             <tbody>
                 @foreach (var it in Model.Items)
                 {
+                    double subtotal = it.UnitPrice * it.Quantity;
                     <tr>
                         <td>
                             <div class="d-flex align-items-center gap-3">
-                                <img src="@it.ImageUrl" alt="@it.Name" style="width:72px;height:72px;object-fit:cover;border-radius:12px;" />
+                                @* If you don’t have images yet, omit the <img> *@
                                 <div>
                                     <div class="fw-semibold">@it.Name</div>
                                     <div class="text-muted small">@it.ProductId</div>
@@ -57,7 +62,7 @@ else
                                 <button class="btn btn-sm btn-outline-dark" type="submit">Update</button>
                             </form>
                         </td>
-                        <td class="text-end fw-semibold">@it.Subtotal.ToString("C2")</td>
+                        <td class="text-end fw-semibold">@subtotal.ToString("C2")</td>
                         <td class="text-end">
                             <form asp-action="Remove" method="post">
                                 @Html.AntiForgeryToken()
@@ -75,7 +80,7 @@ else
             <tfoot>
                 <tr>
                     <td colspan="4" class="text-end fw-semibold">Total</td>
-                    <td class="text-end fw-bold">@Model.Total.ToString("C2")</td>
+                    <td class="text-end fw-bold">@total.ToString("C2")</td>
                     <td></td>
                 </tr>
             </tfoot>
@@ -87,6 +92,8 @@ else
             @Html.AntiForgeryToken()
             <button class="btn btn-outline-danger">Clear Cart</button>
         </form>
-        <a asp-controller="Checkout" asp-action="Index" class="btn btn-dark">Checkout</a>
+
+        @* No CheckoutController yet — keep disabled to avoid 404 *@
+        <a class="btn btn-dark disabled" tabindex="-1" aria-disabled="true">Checkout (coming soon)</a>
     </div>
 }
