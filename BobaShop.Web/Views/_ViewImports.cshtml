@@ -2,3 +2,6 @@
 @using BobaShop.Web.Models
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject Microsoft.AspNetCore.Identity.SignInManager<Microsoft.AspNetCore.Identity.IdentityUser> SignInManager
+@inject Microsoft.AspNetCore.Identity.UserManager<Microsoft.AspNetCore.Identity.IdentityUser> UserManager
