@@ -7,7 +7,7 @@
 // -----------------------------------------------------------------------------
 
 using BobaShop.Api.Data;
-using BobaShop.Api.Dtos;      // uses your ToppingCreateDto / ToppingUpdateDto
+using BobaShop.Api.Dtos;      
 using BobaShop.Api.Models;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
@@ -67,7 +67,7 @@ public class ToppingsController : ControllerBase
         {
             Name = dto.Name.Trim(),
             Price = dto.Price,
-            IsActive = dto.IsActive,           // map your DTO field name
+            IsActive = dto.IsActive,           
             CreatedUtc = DateTime.UtcNow
         };
 

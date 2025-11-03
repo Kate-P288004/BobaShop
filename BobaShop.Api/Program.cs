@@ -36,7 +36,7 @@ builder.Services.AddSingleton<MongoDbContext>();
 builder.Services.AddControllers()
     .AddJsonOptions(o =>
     {
-        // Keep enums or date formatting consistent if needed later.
+        
     });
 
 // -----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ builder.Services.AddApiVersioning(options =>
 })
 .AddApiExplorer(options =>
 {
-    options.GroupNameFormat = "'v'VVV";           // e.g. v1, v2
+    options.GroupNameFormat = "'v'VVV";           
     options.SubstituteApiVersionInUrl = true;
 });
 

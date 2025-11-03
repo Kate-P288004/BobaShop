@@ -14,7 +14,7 @@ namespace BobaShop.Web.Controllers
 {
     public class AccountController : Controller
     {
-        // 👇 Use ApplicationUser, not IdentityUser
+        //  Use ApplicationUser, not IdentityUser
         private readonly UserManager<ApplicationUser> _users;
         private readonly SignInManager<ApplicationUser> _signIn;
 

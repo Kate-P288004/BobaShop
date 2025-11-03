@@ -37,7 +37,6 @@ namespace BobaShop.Api.Controllers
 
         // -------------------------------------------------------------
         // GET: /api/v1/drinks?name=milk&active=true&min=5&max=9
-        // Returns drinks that are not soft-deleted, with optional filters.
         // -------------------------------------------------------------
         [AllowAnonymous]
         [HttpGet]
