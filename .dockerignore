@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/node_modules/
+**/Properties/launchSettings.json
+*.user
+*.suo
+*.log
+*.tmp
+*.mdf
+*.ldf
+Dockerfile*
+.dockerignore
+.git
+.gitignore
+.env

@@ -1,0 +1,42 @@
+version: "3.9"
+name: bobashop
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"   # optional: for Compass/Studio 3T on host
+    volumes:
+      - mongo_data:/data/db
+
+  api:
+    build:
+      context: .
+      dockerfile: BobaShop.Api/Dockerfile
+    container_name: api
+    depends_on:
+      - mongodb
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Mongo__ConnectionString: mongodb://mongodb:27017
+      Mongo__Database: BobaShop
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: .
+      dockerfile: BobaShop.Web/Dockerfile
+    container_name: web
+    depends_on:
+      - api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      Api__BaseUrl: http://api:8080
+    ports:
+      - "8081:8081"
+
+volumes:
+  mongo_data:
