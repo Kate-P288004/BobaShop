@@ -163,11 +163,10 @@ If running on a remote VM, replace `localhost` with the VM’s IP.
 
 ## 🧾 Credits
 
-**Student:** Kate Odabas (P288004)
+**Student:** Kate 
 **Course:** Diploma of IT – Application Development Project
 **Lecturer:** South Metropolitan TAFE
 **Project:** AT2 – BoBaTastic / BobaShop Full-Stack Docker Solution
 
 ---
 
-✅ *Now your BobaShop app runs anywhere — even on classroom PCs and Linux VMs!*
