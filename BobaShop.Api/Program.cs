@@ -5,61 +5,73 @@
 // Date: November 2025
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // Description:
-//   Entry point for the BobaShop API (BoBatastic).
-//   This file configures services, middleware, and startup logic for the
-//   ASP.NET Core Web API. Demonstrates advanced features including:
-//     - MongoDB dependency injection
-//     - Controller registration and JSON configuration
-//     - API versioning (v1, v2) using Asp.Versioning
-//     - JWT-based authentication and Swagger integration
-//     - Cross-Origin Resource Sharing (CORS)
-//     - ProblemDetails for unified error handling (RFC7807)
-//     - Automatic database seeding and index creation
+//   Entry point for the BoBatastic API.
+//   Configures MongoDB, ASP.NET Identity (SQLite), JWT auth, API Versioning,
+//   Swagger (with Bearer), CORS, ProblemDetails, and Mongo seeding.
 // -----------------------------------------------------------------------------
 
-using BobaShop.Api.Data;
-using BobaShop.Api.Seed;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.Extensions.Options;
+using System.Text;
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
+using BobaShop.Api.Data;
+using BobaShop.Api.Identity;     // ApplicationUser, AppIdentityDbContext
+using BobaShop.Api.Seed;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // ============================================================================
-// 1) MongoDB Configuration
-// Purpose:
-//   Reads MongoDB settings (connection string, database name) from
-//   appsettings.json, binds them to MongoSettings class, and registers
-//   MongoDbContext as a singleton for dependency injection.
+// 0) Configuration helpers
 // ============================================================================
-builder.Services.Configure<MongoSettings>(
-    builder.Configuration.GetSection("Mongo"));
+var config = builder.Configuration;
+
+// ============================================================================
+// 1) MongoDB (Domain data) ----------------------------------------------------
+// Reads "Mongo" section; registers MongoDbContext (singleton).
+// ============================================================================
+builder.Services.Configure<MongoSettings>(config.GetSection("Mongo"));
 builder.Services.AddSingleton<MongoDbContext>();
 
 // ============================================================================
-// 2) MVC Controllers Configuration
-// Purpose:
-//   Enables ASP.NET Core MVC-style controllers for routing HTTP requests
-//   (GET, POST, PUT, DELETE) to endpoints. Adds JSON serialization options
-//   for consistent camelCase property naming and indentation.
+// 2) ASP.NET Identity (Users/Roles) + SQLite ---------------------------------
+// Uses a local SQLite db for Identity (same db file as Web if desired).
+// appsettings.json:
+// "ConnectionStrings": { "IdentityConnection": "Data Source=identity.db" }
+// ============================================================================
+builder.Services.AddDbContext<AppIdentityDbContext>(opts =>
+    opts.UseSqlite(config.GetConnectionString("IdentityConnection")));
+
+builder.Services
+    .AddIdentity<ApplicationUser, IdentityRole>(opt =>
+    {
+        opt.Password.RequiredLength = 6;
+        opt.Password.RequireDigit = true;
+        opt.Password.RequireUppercase = true;
+        opt.Password.RequireNonAlphanumeric = true;
+    })
+    .AddEntityFrameworkStores<AppIdentityDbContext>()
+    .AddDefaultTokenProviders();
+
+// ============================================================================
+// 3) Controllers + JSON options ----------------------------------------------
 // ============================================================================
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Example: options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        // Example: options.JsonSerializerOptions.WriteIndented = true;
+        // options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        // options.JsonSerializerOptions.WriteIndented = true;
     });
 
 // ============================================================================
-// 3) API Versioning (Asp.Versioning.Mvc)
-// Purpose:
-//   Supports multiple API versions (v1, v2) simultaneously.
-//   - Allows versioning via URL ( /api/v1/orders)
-//   - Reports available API versions in HTTP headers
+// 4) API Versioning (Asp.Versioning) -----------------------------------------
+// URL versioning like /api/v1/drinks and reports available versions in headers.
 // ============================================================================
 builder.Services.AddApiVersioning(options =>
 {
@@ -69,23 +81,24 @@ builder.Services.AddApiVersioning(options =>
 })
 .AddApiExplorer(options =>
 {
-    options.GroupNameFormat = "'v'VVV";            // e.g., v1, v2
-    options.SubstituteApiVersionInUrl = true;      // auto-replaces {version} in route
+    options.GroupNameFormat = "'v'VVV";       // v1, v2
+    options.SubstituteApiVersionInUrl = true;
 });
 
 // ============================================================================
-// 4) JWT Authentication 
-// Purpose:
-//   Configures JSON Web Token authentication for secure API access.
-//   - Reads key, issuer, and audience from appsettings.json
-//   - Enforces signature validation, expiry, and claim integrity
+// 5) JWT Authentication -------------------------------------------------------
+// Reads "Jwt": { Key, Issuer, Audience } from appsettings.json.
 // ============================================================================
-var jwt = builder.Configuration.GetSection("Jwt");
+var jwt = config.GetSection("Jwt");
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
 
 builder.Services
-    .AddAuthentication("JwtBearer")
-    .AddJwtBearer("JwtBearer", options =>
+    .AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -96,21 +109,19 @@ builder.Services
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = signingKey,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(2) // allows small clock drift
+            ClockSkew = TimeSpan.FromMinutes(2)
         };
     });
 
+builder.Services.AddAuthorization();
+
 // ============================================================================
-// 5) Swagger / OpenAPI Configuration
-// Purpose:
-//   Automatically generates interactive API documentation.
-//   - Defines endpoints for v1 and v2
-//   - Integrates JWT Bearer authentication support for testing
+// 6) Swagger / OpenAPI --------------------------------------------------------
+// Adds two docs (v1, v2) and configures the Bearer auth button.
 // ============================================================================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    // Register both versions for testing and versioning evidence
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "BoBatastic API v1",
@@ -124,73 +135,91 @@ builder.Services.AddSwaggerGen(options =>
         Description = "Version 2 – Demonstrates API versioning for AT2 evidence."
     });
 
-    // JWT Bearer configuration for Swagger Authorize button
-    var scheme = new OpenApiSecurityScheme
+    var bearer = new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter 'Bearer {your_token}' below."
+        Description = "Enter: Bearer {your_token}"
     };
-    options.AddSecurityDefinition("Bearer", scheme);
+    options.AddSecurityDefinition("Bearer", bearer);
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        { scheme, Array.Empty<string>() }
+        { bearer, Array.Empty<string>() }
     });
 });
 
 // ============================================================================
-// 6) CORS (Cross-Origin Resource Sharing)
-// Purpose:
-//   Allows requests from the frontend web app (BobaShop.Web) to access the API.
-//   Configurable through appsettings.json for security and flexibility.
+// 7) CORS ---------------------------------------------------------------------
+// Allows calls from the MVC frontend (BobaShop.Web). In Dev, allow all.
+// appsettings.json:
+// "Cors": { "AllowedOrigins": ["https://localhost:7243","http://localhost:5262"] }
 // ============================================================================
-string[] allowedOrigins = builder.Configuration
-    .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>() ?? Array.Empty<string>();
-
 const string CorsPolicyName = "BoBaCors";
-
+string[] allowedOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(CorsPolicyName, policy =>
     {
         if (allowedOrigins.Length > 0)
-        {
-            policy.WithOrigins(allowedOrigins)
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
+            policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod();
         else
-        {
-            // Development fallback: allow all origins
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
-        }
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod(); // Dev fallback
     });
 });
 
 // ============================================================================
-// 7) ProblemDetails (RFC7807 Standardized Error Responses)
-// Purpose:
-//   Provides consistent, machine-readable error responses across the API.
-//   Simplifies debugging and aligns with RESTful best practices.
+// 8) ProblemDetails (RFC7807) -------------------------------------------------
 // ============================================================================
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
 // ============================================================================
-// 8) Middleware Pipeline Configuration
-// Purpose:
-//   Defines the sequence of middleware executed for each HTTP request.
-//   Includes error handling, Swagger, authentication, authorization, and routing.
+// 9) Identity DB: log path + ensure migrations -------------------------------
+// This guarantees the API points to the expected SQLite file and that the
+// Identity schema exists (AspNetUsers, etc.).
 // ============================================================================
+app.Logger.LogInformation("IdentityConnection: {cs}", builder.Configuration.GetConnectionString("IdentityConnection"));
 
-// Global exception handler -> returns ProblemDetails JSON
+using (var scope = app.Services.CreateScope())
+{
+    // --- Ensure Identity DB is migrated and log absolute path
+    var idDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
+
+    var cs = idDb.Database.GetDbConnection().ConnectionString;
+    var sb = new SqliteConnectionStringBuilder(cs);
+    var absPath = Path.GetFullPath(sb.DataSource ?? "identity.db");
+    app.Logger.LogInformation("Identity DB file: {absPath}", absPath);
+
+    idDb.Database.Migrate();
+
+    // (Optional) seed roles/admin once if you need role-protected endpoints
+    var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+    if (!await roleMgr.RoleExistsAsync("Customer"))
+        await roleMgr.CreateAsync(new IdentityRole("Customer"));
+
+    if (!await roleMgr.RoleExistsAsync("Admin"))
+        await roleMgr.CreateAsync(new IdentityRole("Admin"));
+
+    // Demo admin (optional)
+    const string adminEmail = "admin@bobatastic.local";
+    var admin = await userMgr.FindByEmailAsync(adminEmail);
+    if (admin == null)
+    {
+        admin = new ApplicationUser { UserName = adminEmail, Email = adminEmail, FullName = "Demo Admin" };
+        await userMgr.CreateAsync(admin, "Admin123$");
+        await userMgr.AddToRoleAsync(admin, "Admin");
+    }
+}
+
+// ============================================================================
+// 10) Middleware pipeline -----------------------------------------------------
+// ============================================================================
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
@@ -209,39 +238,33 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-// Enable Swagger only in development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI(options =>
+    app.UseSwaggerUI(o =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "BoBatastic API v1");
-        options.SwaggerEndpoint("/swagger/v2/swagger.json", "BoBatastic API v2");
+        o.SwaggerEndpoint("/swagger/v1/swagger.json", "BoBatastic API v1");
+        o.SwaggerEndpoint("/swagger/v2/swagger.json", "BoBatastic API v2");
     });
 }
 
-// Enforce HTTPS, CORS, and authentication/authorization
 app.UseHttpsRedirection();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map controller routes (/api/v1/drinks)
 app.MapControllers();
 
 // ============================================================================
-// 9) Database Seeding + Index Creation
-// Purpose:
-//   Initializes MongoDB with default data (Drinks, etc.) and ensures that
-//   required indexes are created for performance and query optimization.
+// 11) Mongo seeding + index creation -----------------------------------------
 // ============================================================================
 using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
     try
     {
-        DatabaseSeeder.Seed(ctx);                 // Insert default data
-        IndexConfigurator.EnsureIndexes(ctx);     // Create unique indexes 
+        DatabaseSeeder.Seed(ctx);
+        IndexConfigurator.EnsureIndexes(ctx);
     }
     catch (Exception ex)
     {
@@ -250,9 +273,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // ============================================================================
-// 10) Run the Application
-// Purpose:
-//   Starts the web server and begins listening for incoming HTTP requests.
+// 12) Run ---------------------------------------------------------------------
 // ============================================================================
 app.Run();
 

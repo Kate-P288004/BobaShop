@@ -1,21 +1,11 @@
-﻿// -----------------------------------------------------------------------------
-// File: AuthController.cs
-// Project: BobaShop.Api
-// Student: Kate Odabas (P288004)
-// Date: November 2025
-// Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
-// Description:
-//   Provides a basic authentication endpoint for development and testing.
-//   Generates a JSON Web Token (JWT) with a hardcoded Admin claim.
-//   JWT configuration is read from appsettings.json.
-// -----------------------------------------------------------------------------
-
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using BobaShop.Api.Identity;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BobaShop.Api.Controllers
 {
@@ -24,67 +14,109 @@ namespace BobaShop.Api.Controllers
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _config;
-        private readonly IWebHostEnvironment _env;
+        private readonly UserManager<ApplicationUser> _users;
+        private readonly SignInManager<ApplicationUser> _signIn;
 
-        // ---------------------------------------------------------------------
-        // Constructor: Injects configuration and hosting environment
-        // ---------------------------------------------------------------------
-        public AuthController(IConfiguration config, IWebHostEnvironment env)
+        public AuthController(IConfiguration config,
+                              UserManager<ApplicationUser> users,
+                              SignInManager<ApplicationUser> signIn)
         {
             _config = config;
-            _env = env;
+            _users = users;
+            _signIn = signIn;
         }
 
-        // Record type used for simple login payload (email + password)
-        public record LoginDto(string Email, string Password);
+        // DTOs kept INSIDE the class to avoid top-level statements
+        public record RegisterRequest(string Email, string Password, string ConfirmPassword, string Name);
+        public record LoginRequest(string Email, string Password);
 
-        // ---------------------------------------------------------------------
-        // POST: /api/auth/login
-        // Purpose:
-        //   Issues a JWT for development use only.
-        //   The token includes email and role claims.
-        // Notes:
-        //   • This endpoint is disabled in production environments.
-        //   • JWT settings are loaded from appsettings.json > "Jwt" section.
-        //   • Token expires in 2 hours.
-        // ---------------------------------------------------------------------
-        [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginDto dto)
+        private string CreateJwtToken(ApplicationUser user, IEnumerable<string> roles)
         {
-            // Prevent this endpoint from being used outside development
-            if (!_env.IsDevelopment())
-                return Forbid(); // Return 403 Forbidden in production
-
-            // Load JWT configuration values
             var jwt = _config.GetSection("Jwt");
-
-            // Create symmetric security key using secret from configuration
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt["Key"]!));
-
-            // Create signing credentials using HMAC SHA-256
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Define claims (user identity information)
-            var claims = new[]
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, dto.Email ?? "admin@bobatastic.local"),
-                new Claim(ClaimTypes.Email, dto.Email ?? "admin@bobatastic.local"),
-                new Claim(ClaimTypes.Role, "Admin")  // Assign Admin role for test login
+                new(JwtRegisteredClaimNames.Sub, user.Id),
+                new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
+                new(ClaimTypes.NameIdentifier, user.Id),
+                new(ClaimTypes.Name, user.UserName ?? string.Empty),
+                new("fullName", user.FullName ?? string.Empty)
             };
+            foreach (var r in roles) claims.Add(new Claim(ClaimTypes.Role, r));
 
-            // Build the JWT token
             var token = new JwtSecurityToken(
                 issuer: jwt["Issuer"],
                 audience: jwt["Audience"],
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(2),
-                signingCredentials: creds);
+                signingCredentials: creds
+            );
 
-            // Convert token to string for client use
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
 
-            // Return token to client as JSON response
-            return Ok(new { token = tokenString });
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest req)
+        {
+            if (req is null) return BadRequest(new { error = "Invalid payload." });
+            if (string.IsNullOrWhiteSpace(req.Email) ||
+                string.IsNullOrWhiteSpace(req.Password) ||
+                string.IsNullOrWhiteSpace(req.ConfirmPassword) ||
+                string.IsNullOrWhiteSpace(req.Name))
+                return BadRequest(new { error = "Email, Password, ConfirmPassword and Name are required." });
+
+            if (req.Password != req.ConfirmPassword)
+                return BadRequest(new { error = "Passwords do not match." });
+
+            var existing = await _users.FindByEmailAsync(req.Email);
+            if (existing != null)
+                return Conflict(new { error = "Email is already registered." });
+
+            var user = new ApplicationUser
+            {
+                UserName = req.Email,
+                Email = req.Email,
+                FullName = req.Name,
+                RewardPoints = 0
+            };
+
+            var create = await _users.CreateAsync(user, req.Password);
+            if (!create.Succeeded)
+                return BadRequest(new { errors = create.Errors.Select(e => e.Description) });
+
+            try { await _users.AddToRoleAsync(user, "Customer"); } catch { /* ok if roles not seeded */ }
+
+            return Created($"/api/users/{user.Id}", new { id = user.Id, email = user.Email, message = "User registered successfully" });
+        }
+
+        [HttpPost("login")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Login([FromBody] LoginRequest req)
+        {
+            if (req is null) return BadRequest(new { error = "Invalid payload." });
+
+            var user = await _users.FindByEmailAsync(req.Email);
+            if (user is null)
+                return BadRequest(new { error = "Invalid email or password." });
+
+            var valid = await _signIn.CheckPasswordSignInAsync(user, req.Password, false);
+            if (!valid.Succeeded)
+                return BadRequest(new { error = "Invalid email or password." });
+
+            var roles = await _users.GetRolesAsync(user);
+            if (roles == null || roles.Count == 0) roles = new List<string> { "Customer" };
+
+            var token = CreateJwtToken(user, roles);
+
+            return Ok(new
+            {
+                token,
+                user = new { id = user.Id, email = user.Email, name = user.FullName, roles },
+                expiresInSeconds = 7200
+            });
         }
     }
 }
