@@ -2,30 +2,51 @@
 // File: DatabaseSeeder.cs
 // Project: BobaShop.Api
 // Student: Kate Odabas (P288004)
-// Date: October 2025
-// Assessment: Diploma of IT – Application Development Project
+// Date: November 2025
+// Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // Description:
-// Seeds initial MongoDB collections (Drinks) when the application first runs.
+//   Seeds the MongoDB database with initial sample data when the application
+//   starts. This ensures the Drinks collection contains default menu items
+//   for testing and demonstration purposes. Implements seeding logic for the
+//   NoSQL environment using the MongoDB .NET Driver.
 // -----------------------------------------------------------------------------
 
 using MongoDB.Driver;
 using BobaShop.Api.Data;
 using BobaShop.Api.Models;
+using System;
+using System.Collections.Generic;
 
 namespace BobaShop.Api.Seed
 {
+    // -------------------------------------------------------------------------
+    // Class: DatabaseSeeder
+    // Purpose:
+    //   Provides static seeding logic for the application database.
+    //   If the Drinks collection is empty, a predefined list of sample
+    //   drinks is inserted into MongoDB on startup.
+    // Mapping: ICTPRG554 / ICTPRG556 PE2.1
+    // -------------------------------------------------------------------------
     public static class DatabaseSeeder
     {
         /// <summary>
-        /// Inserts initial sample data if collections are empty.
+        /// Inserts default drink data into MongoDB if the collection is empty.
+        /// This method is typically called from Program.cs during application startup.
         /// </summary>
+        /// <param name="context">The MongoDbContext instance used to access collections.</param>
         public static void Seed(MongoDbContext context)
         {
+            // Access the Drinks collection directly
             var drinks = context.GetCollection<Drink>("Drinks");
 
+            // Only seed if the collection has no existing records
             if (!drinks.Find(_ => true).Any())
             {
                 var now = DateTime.UtcNow;
+
+                // -------------------------------------------------------------
+                // Seed Data: Sample drinks used for development/testing
+                // -------------------------------------------------------------
                 var seedData = new List<Drink>
                 {
                     // ------------------ CORE MILK TEAS ------------------
@@ -153,6 +174,7 @@ namespace BobaShop.Api.Seed
                     }
                 };
 
+                // Insert all records in one batch operation
                 drinks.InsertMany(seedData);
             }
         }

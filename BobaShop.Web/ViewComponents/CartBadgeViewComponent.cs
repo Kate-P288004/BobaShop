@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace BobaShop.Web.ViewComponents
 {
-    // Optional explicit name, but helps if anything is off
+   
     [ViewComponent(Name = "CartBadge")]
     public class CartBadgeViewComponent : ViewComponent
     {

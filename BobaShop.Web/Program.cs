@@ -71,7 +71,7 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IRewardsService, RewardsService>();
 
 // -----------------------------------------------------------------------------
-// 6) API CLIENT (HttpClient for v1 endpoints)
+// 6) API CLIENT (HttpClient endpoints)
 // -----------------------------------------------------------------------------
 builder.Services.AddHttpClient<IDrinksApi, DrinksApi>(client =>
 {

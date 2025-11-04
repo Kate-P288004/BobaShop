@@ -1,7 +1,7 @@
 ﻿@model BobaShop.Web.Models.CartViewModel
 @{
     ViewData["Title"] = "Cart";
-    // UnitPrice is double => use double math here
+    // UnitPrice is double to use double math here
     double total = Model?.Items?.Sum(i => i.UnitPrice * i.Quantity) ?? 0.0;
 }
 
@@ -34,7 +34,7 @@ else
                     <tr>
                         <td>
                             <div class="d-flex align-items-center gap-3">
-                                @* If you don’t have images yet, omit the <img> *@
+                                @*  images <img> *@
                                 <div>
                                     <div class="fw-semibold">@it.Name</div>
                                     <div class="text-muted small">@it.ProductId</div>
@@ -94,6 +94,6 @@ else
         </form>
 
         @* No CheckoutController yet — keep disabled to avoid 404 *@
-        <a class="btn btn-dark disabled" tabindex="-1" aria-disabled="true">Checkout (coming soon)</a>
+        <a class="btn btn-dark disabled" tabindex="-1" aria-disabled="true">Checkout (demo) </a>
     </div>
 }

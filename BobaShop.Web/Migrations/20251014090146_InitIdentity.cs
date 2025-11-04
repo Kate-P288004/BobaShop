@@ -1,16 +1,39 @@
-﻿using System;
+﻿// -----------------------------------------------------------------------------
+// File: Migrations/2025xxxxxx_InitIdentity.cs
+// Project: BobaShop.Web 
+// Student: Kate Odabas (P288004)
+// Date: November 2025
+// Assessment: AT2 – MVC & NoSQL Project (ICTPRG556 – MVC / Identity)
+// Description:
+//   Entity Framework Core migration that scaffolds ASP.NET Core Identity schema
+//   on SQLite. Creates the standard Identity tables (roles, users, claims,
+//   logins, tokens, user-roles) with appropriate primary keys, FKs, and indexes.
+//   This is part of the web app's authentication/authorization layer.
+// -----------------------------------------------------------------------------
+
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace BobaShop.Web.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Initial Identity schema creation for SQLite.
+    /// </summary>
     public partial class InitIdentity : Migration
     {
-        /// <inheritdoc />
+        /// <summary>
+        /// Applies the migration:
+        ///  - Creates all ASP.NET Identity tables
+        ///  - Adds primary/foreign keys and unique indexes
+        ///  - Uses TEXT/INTEGER column types mapped for SQLite
+        /// </summary>
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // -----------------------------------------------------------------
+            // Roles table 
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
                 columns: table => new
@@ -25,6 +48,11 @@ namespace BobaShop.Web.Migrations
                     table.PrimaryKey("PK_AspNetRoles", x => x.Id);
                 });
 
+            // -----------------------------------------------------------------
+            // Users table
+            // Columns are the standard Identity fields; custom fields are added
+            // via a subsequent migration if present.
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetUsers",
                 columns: table => new
@@ -50,6 +78,9 @@ namespace BobaShop.Web.Migrations
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
                 });
 
+            // -----------------------------------------------------------------
+            // RoleClaims: arbitrary claims attached to a role
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetRoleClaims",
                 columns: table => new
@@ -71,6 +102,9 @@ namespace BobaShop.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // -----------------------------------------------------------------
+            // UserClaims: arbitrary claims attached to a user
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetUserClaims",
                 columns: table => new
@@ -92,6 +126,11 @@ namespace BobaShop.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // -----------------------------------------------------------------
+            // UserLogins: external login providers
+            // 
+            // Composite PK: 
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetUserLogins",
                 columns: table => new
@@ -112,6 +151,10 @@ namespace BobaShop.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // -----------------------------------------------------------------
+            // UserRoles: junction table linking users to roles (many-to-many)
+            // Composite PK: (UserId, RoleId)
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetUserRoles",
                 columns: table => new
@@ -136,6 +179,10 @@ namespace BobaShop.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // -----------------------------------------------------------------
+            // UserTokens: stores tokens for users
+            // Composite PK: (UserId, LoginProvider, Name)
+            // -----------------------------------------------------------------
             migrationBuilder.CreateTable(
                 name: "AspNetUserTokens",
                 columns: table => new
@@ -156,6 +203,12 @@ namespace BobaShop.Web.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            // -----------------------------------------------------------------
+            // Indexes: normalize and speed up lookup for usernames/emails/roles
+            //   RoleNameIndex unique on NormalizedName
+            //   UserNameIndex unique on NormalizedUserName
+            //   EmailIndex on NormalizedEmail
+            // -----------------------------------------------------------------
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
@@ -194,29 +247,22 @@ namespace BobaShop.Web.Migrations
                 unique: true);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Reverts the migration:
+        ///  - Drops all Identity tables (reverse order to satisfy FKs)
+        /// </summary>
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "AspNetRoleClaims");
+            // Drop FK-dependent tables first
+            migrationBuilder.DropTable(name: "AspNetRoleClaims");
+            migrationBuilder.DropTable(name: "AspNetUserClaims");
+            migrationBuilder.DropTable(name: "AspNetUserLogins");
+            migrationBuilder.DropTable(name: "AspNetUserRoles");
+            migrationBuilder.DropTable(name: "AspNetUserTokens");
 
-            migrationBuilder.DropTable(
-                name: "AspNetUserClaims");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserLogins");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserRoles");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserTokens");
-
-            migrationBuilder.DropTable(
-                name: "AspNetRoles");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUsers");
+            // Then drop principals
+            migrationBuilder.DropTable(name: "AspNetRoles");
+            migrationBuilder.DropTable(name: "AspNetUsers");
         }
     }
 }

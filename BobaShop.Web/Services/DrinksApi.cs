@@ -4,7 +4,7 @@
 // Student: Kate Odabas (P288004)
 // Date: October 2025
 // Purpose:
-//   Service to call the BoBatastic API (v1) for Drinks data.
+//   Service to call the BoBatastic API for Drinks data.
 //   This keeps Web MVC separate from API logic and uses HttpClient.
 // ---------------------------------------------------------------
 

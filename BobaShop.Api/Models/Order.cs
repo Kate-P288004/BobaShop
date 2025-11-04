@@ -1,64 +1,84 @@
-﻿using MongoDB.Bson;
+﻿// -----------------------------------------------------------------------------
+// File: Order.cs
+// Project: BobaShop.Api
+// Student: Kate Odabas (P288004)
+// Date: November 2025
+// Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
+// Description:
+//   Represents a customer order document stored in the MongoDB Orders collection.
+//   Contains references to Drinks and Toppings, total price calculation,
+//   customer email, order status, and Magic Three Dates for lifecycle tracking.
+//   Demonstrates one-to-many relationships between collections in MongoDB.
+// -----------------------------------------------------------------------------
+
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using System;
+using System.Collections.Generic;
 
-namespace BobaShop.Api.Models;
-
-/// <summary>
-/// Represents a customer order in the BobaShop API.
-/// Includes drinks, total amount, and timestamps.
-/// </summary>
-public class Order
+namespace BobaShop.Api.Models
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+    // -------------------------------------------------------------------------
+    // Model: Order
+    // Purpose:
+    //   Represents a customer order within the BobaShop API.
+    //   Each order links to drink and topping IDs, and records total price,
+    //   status, and lifecycle timestamps.
+    // Mapping: ICTPRG554 PE1.1 / PE1.2 / ICTPRG556 PE2.1
+    // -------------------------------------------------------------------------
+    public class Order
+    {
+        // -------------------------------------------------------------
+        // Primary Key
+        // -------------------------------------------------------------
+        // Unique MongoDB identifier (ObjectId)
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
-    /// <summary>
-    /// The email of the customer placing the order.
-    /// </summary>
-    [BsonElement("customerEmail")]
-    public string CustomerEmail { get; set; } = default!;
+        // -------------------------------------------------------------
+        // Customer Information
+        // -------------------------------------------------------------
+        // Email address of the customer who placed the order
+        [BsonElement("customerEmail")]
+        public string CustomerEmail { get; set; } = default!;
 
-    /// <summary>
-    /// The list of ordered drink IDs.
-    /// </summary>
-    [BsonElement("drinkIds")]
-    public List<string> DrinkIds { get; set; } = new();
+        // -------------------------------------------------------------
+        // Order Contents
+        // -------------------------------------------------------------
+        // List of drink ObjectIds included in the order
+        [BsonElement("drinkIds")]
+        public List<string> DrinkIds { get; set; } = new();
 
-    /// <summary>
-    /// The list of selected topping IDs (optional).
-    /// </summary>
-    [BsonElement("toppingIds")]
-    public List<string>? ToppingIds { get; set; }
+        // Optional list of topping ObjectIds selected for the order
+        [BsonElement("toppingIds")]
+        public List<string>? ToppingIds { get; set; }
 
-    /// <summary>
-    /// The order total (in AUD).
-    /// </summary>
-    [BsonElement("total")]
-    [BsonRepresentation(BsonType.Decimal128)]
-    public decimal Total { get; set; }
+        // -------------------------------------------------------------
+        // Pricing and Status
+        // -------------------------------------------------------------
+        // Total cost of the order (in AUD)
+        [BsonElement("total")]
+        [BsonRepresentation(BsonType.Decimal128)]
+        public decimal Total { get; set; }
 
-    /// <summary>
-    /// Order status (New, InProgress, Completed, Cancelled).
-    /// </summary>
-    [BsonElement("status")]
-    public string Status { get; set; } = "New";
+        // Current order status
+        [BsonElement("status")]
+        public string Status { get; set; } = "New";
 
-    /// <summary>
-    /// Created timestamp (Magic Three Dates requirement).
-    /// </summary>
-    [BsonElement("createdUtc")]
-    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+        // -------------------------------------------------------------
+        // MAGIC THREE DATES (Record Lifecycle Tracking)
+        // -------------------------------------------------------------
+        // CreatedUtc: Date/time when order was placed (UTC)
+        [BsonElement("createdUtc")]
+        public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
-    /// <summary>
-    /// Updated timestamp (Magic Three Dates requirement).
-    /// </summary>
-    [BsonElement("updatedUtc")]
-    public DateTime? UpdatedUtc { get; set; }
+        // UpdatedUtc: Date/time when order was last modified
+        [BsonElement("updatedUtc")]
+        public DateTime? UpdatedUtc { get; set; }
 
-    /// <summary>
-    /// Soft delete timestamp (Magic Three Dates requirement).
-    /// </summary>
-    [BsonElement("deletedUtc")]
-    public DateTime? DeletedUtc { get; set; }
+        // DeletedUtc: Soft delete marker (null means active order)
+        [BsonElement("deletedUtc")]
+        public DateTime? DeletedUtc { get; set; }
+    }
 }
