@@ -34,7 +34,7 @@ namespace BobaShop.Api.Data
 
         // Optional constants (for clarity and to avoid typos)
         private const string CustomersCollection = "customers";
-        private const string DrinksCollection = "drinks";
+        private const string DrinksCollection = "Drinks";
         private const string ToppingsCollection = "toppings";
         private const string OrdersCollection = "orders";
 

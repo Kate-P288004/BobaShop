@@ -1,28 +1,56 @@
 // ---------------------------------------------------------------
 // File: Program.cs
-// Project: BobaShop.Web (BoBatastic)
+// Project: BobaShop.Web (BoBaTastic)
 // Student: Kate Odabas (P288004)
-// Date: October 2025
-// Purpose:
-//   - Configures ASP.NET Core MVC with Identity (SQLite)
-//   - Registers HttpClient for API v1 integration
-//   - Adds Session, Cart, and Rewards services
-//   - Seeds default Admin + roles
+// Date: November 2025
 // ---------------------------------------------------------------
 
 using BobaShop.Web.Data;
 using BobaShop.Web.Services;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
+using System.IO;
+using Microsoft.AspNetCore.Http;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
 // -----------------------------------------------------------------------------
-// 1) DATABASE (SQLite for Identity)
+// 1) DATABASE (SQLite for Identity) — build absolute path to identity.db
 // -----------------------------------------------------------------------------
+string BuildIdentityConnection(WebApplicationBuilder b)
+{
+    var raw = b.Configuration.GetConnectionString("IdentityDb") ?? "Data Source=identity.db";
+
+    const string prefix = "Data Source=";
+    if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var file = raw[prefix.Length..].Trim();
+        if (string.IsNullOrWhiteSpace(file)) file = "identity.db";
+        if (!Path.IsPathRooted(file))
+            file = Path.Combine(b.Environment.ContentRootPath, file);
+
+        return $"{prefix}{file}";
+    }
+    return raw;
+}
+
+var identityCs = BuildIdentityConnection(builder);
+
 builder.Services.AddDbContext<ApplicationDbContext>(opts =>
-    opts.UseSqlite(builder.Configuration.GetConnectionString("IdentityDb")));
+    opts.UseSqlite(identityCs));
+
+var keysPath = Path.Combine(
+    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+    "BobaShop", "keys");
+Directory.CreateDirectory(keysPath);
+
+builder.Services
+    .AddDataProtection()
+    .SetApplicationName("BobaShop.Web")
+    .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 
 // -----------------------------------------------------------------------------
 // 2) IDENTITY (ApplicationUser + Roles)
@@ -71,19 +99,17 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IRewardsService, RewardsService>();
 
 // -----------------------------------------------------------------------------
-// 6) API CLIENT (HttpClient endpoints)
+// 6) API CLIENT (HttpClient for BobaShop.Api)
 // -----------------------------------------------------------------------------
-builder.Services.AddHttpClient<IDrinksApi, DrinksApi>(client =>
+builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
 {
-    // Base URL is stored in appsettings.json: "Api:BaseUrl": "https://localhost:5001/api/v1/"
-    var apiBase = builder.Configuration["Api:BaseUrl"];
-    if (string.IsNullOrEmpty(apiBase))
-        throw new InvalidOperationException("Missing API base URL in appsettings.json.");
-
+    var apiBase = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
+    if (!apiBase.EndsWith("/")) apiBase += "/";
     client.BaseAddress = new Uri(apiBase);
     client.DefaultRequestHeaders.Accept.Add(
         new MediaTypeWithQualityHeaderValue("application/json"));
-});
+})
+.SetHandlerLifetime(TimeSpan.FromMinutes(5)); // optional; built-in
 
 // -----------------------------------------------------------------------------
 // 7) IDENTITY SEEDER (Roles + Admin user)
@@ -91,6 +117,10 @@ builder.Services.AddHttpClient<IDrinksApi, DrinksApi>(client =>
 builder.Services.AddScoped<IdentitySeeder>();
 
 var app = builder.Build();
+
+// Log important paths after Build()
+app.Logger.LogInformation("Identity DB: {cs}", identityCs);
+app.Logger.LogInformation("API BaseUrl: {api}", app.Configuration["Api:BaseUrl"]);
 
 // -----------------------------------------------------------------------------
 // 8) APPLY MIGRATIONS + SEED ROLES/ADMIN
@@ -119,9 +149,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
 app.UseRouting();
 
-// Session must be before MVC endpoints
 app.UseSession();
 
 app.UseAuthentication();
@@ -170,9 +200,7 @@ public class IdentitySeeder
 
             var result = await _users.CreateAsync(admin, adminPassword);
             if (result.Succeeded)
-            {
                 await _users.AddToRoleAsync(admin, adminRole);
-            }
         }
     }
 }

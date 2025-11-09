@@ -6,10 +6,10 @@
 // Assessment: Diploma of IT – Application Development Project
 // Description:
 //   API v1 controller providing CRUD endpoints for managing drinks in MongoDB.
-//   - Uses API Versioning (Asp.Versioning) => /api/v1/drinks
+//   - Versioning (Asp.Versioning) => /api/v1/drinks
 //   - Magic Three Dates: CreatedUtc, UpdatedUtc, DeletedUtc (soft delete)
-//   - Read endpoints: [AllowAnonymous]
-//   - Write endpoints: [Authorize(Roles = "Admin")]
+//   - Read: [AllowAnonymous]
+//   - Write: [Authorize(Roles = "Admin")]
 // -----------------------------------------------------------------------------
 
 using Asp.Versioning;
@@ -19,12 +19,12 @@ using BobaShop.Api.Data;
 using BobaShop.Api.Models;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using ApiVersionAttribute = Asp.Versioning.ApiVersionAttribute;
 
 namespace BobaShop.Api.Controllers
 {
     [ApiController]
     [Asp.Versioning.ApiVersion("1.0")]
-
     [Route("api/v{version:apiVersion}/[controller]")]
     public class DrinksController : ControllerBase
     {
@@ -32,21 +32,35 @@ namespace BobaShop.Api.Controllers
 
         public DrinksController(MongoDbContext context)
         {
-            _drinks = context.Drinks; // or: context.GetCollection<Drink>("drinks");
+            _drinks = context.Drinks;
         }
 
+        // Helpers
+        private static bool IsValidObjectId(string id) => ObjectId.TryParse(id, out _);
+        private static bool IsValidPercent(int? v) => v is null || v is 0 or 25 or 50 or 75 or 100;
+
         // -------------------------------------------------------------
-        // GET: /api/v1/drinks?name=milk&active=true&min=5&max=9
+        // GET: /api/v1/drinks?name=milk&active=true&min=5&max=9&sort=name&dir=asc&skip=0&take=20
+        // Returns: 200 OK + list; X-Total-Count header for client paging.
         // -------------------------------------------------------------
         [AllowAnonymous]
         [HttpGet]
-        public async Task<ActionResult<List<Drink>>> GetAll(
+        [ProducesResponseType(typeof(List<Drink>), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetAll(
             [FromQuery] string? name,
             [FromQuery] bool? active,
             [FromQuery] decimal? min,
-            [FromQuery] decimal? max)
+            [FromQuery] decimal? max,
+            [FromQuery] string? sort = "name",
+            [FromQuery] string? dir = "asc",
+            [FromQuery] int skip = 0,
+            [FromQuery] int take = 50,
+            CancellationToken ct = default)
         {
-            var filter = Builders<Drink>.Filter.Where(d => d.DeletedUtc == null);
+            if (take is < 1 or > 200) take = 50;
+            if (skip < 0) skip = 0;
+
+            var filter = Builders<Drink>.Filter.Eq(d => d.DeletedUtc, null);
 
             if (!string.IsNullOrWhiteSpace(name))
                 filter &= Builders<Drink>.Filter.Regex(d => d.Name, new BsonRegularExpression(name, "i"));
@@ -57,58 +71,104 @@ namespace BobaShop.Api.Controllers
             if (min.HasValue) filter &= Builders<Drink>.Filter.Gte(d => d.BasePrice, min.Value);
             if (max.HasValue) filter &= Builders<Drink>.Filter.Lte(d => d.BasePrice, max.Value);
 
-            var list = await _drinks.Find(filter).SortBy(d => d.Name).ToListAsync();
-            return Ok(list);
+            var countTask = _drinks.CountDocumentsAsync(filter, cancellationToken: ct);
+
+            IFindFluent<Drink, Drink> query = _drinks.Find(filter);
+
+            // Sort
+            sort = sort?.Trim().ToLowerInvariant();
+            dir = dir?.Trim().ToLowerInvariant();
+            var ascending = dir is not "desc";
+
+            query = sort switch
+            {
+                "price" => ascending ? query.SortBy(d => d.BasePrice) : query.SortByDescending(d => d.BasePrice),
+                "created" => ascending ? query.SortBy(d => d.CreatedUtc) : query.SortByDescending(d => d.CreatedUtc),
+                _ => ascending ? query.SortBy(d => d.Name) : query.SortByDescending(d => d.Name)
+            };
+
+            var itemsTask = query.Skip(skip).Limit(take).ToListAsync(ct);
+
+            var total = await countTask;
+            var items = await itemsTask;
+
+            Response.Headers["X-Total-Count"] = total.ToString();
+            return Ok(items);
         }
 
         // -------------------------------------------------------------
         // GET: /api/v1/drinks/{id}
-        // Retrieve a specific drink by ObjectId string (24 chars).
         // -------------------------------------------------------------
         [AllowAnonymous]
         [HttpGet("{id:length(24)}")]
-        public async Task<ActionResult<Drink>> GetById(string id)
+        [ProducesResponseType(typeof(Drink), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetById(string id, CancellationToken ct = default)
         {
-            if (!ObjectId.TryParse(id, out _)) return BadRequest("Invalid id format.");
-            var drink = await _drinks.Find(d => d.Id == id && d.DeletedUtc == null).FirstOrDefaultAsync();
+            if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
+
+            var drink = await _drinks
+                .Find(d => d.Id == id && d.DeletedUtc == null)
+                .FirstOrDefaultAsync(ct);
+
             return drink is null ? NotFound() : Ok(drink);
         }
 
         // -------------------------------------------------------------
         // POST: /api/v1/drinks
-        // Create a new drink (CreatedUtc set automatically).
+        // Create a new drink.
         // -------------------------------------------------------------
         [Authorize(Roles = "Admin")]
         [HttpPost]
-        public async Task<ActionResult<Drink>> Create([FromBody] Drink model)
+        [ProducesResponseType(typeof(Drink), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> Create([FromBody] Drink model, CancellationToken ct = default)
         {
             if (model is null) return BadRequest("Body is required.");
             if (string.IsNullOrWhiteSpace(model.Name)) return BadRequest("Name is required.");
             if (model.BasePrice < 0) return BadRequest("BasePrice must be >= 0.");
+            if (!IsValidPercent(model.DefaultSugar)) return BadRequest("DefaultSugar must be 0,25,50,75,100.");
+            if (!IsValidPercent(model.DefaultIce)) return BadRequest("DefaultIce must be 0,25,50,75,100.");
 
             model.Id = string.IsNullOrWhiteSpace(model.Id) ? ObjectId.GenerateNewId().ToString() : model.Id;
+            model.Name = model.Name.Trim();
+            model.Description = model.Description?.Trim() ?? string.Empty;
             model.CreatedUtc = DateTime.UtcNow;
             model.UpdatedUtc = null;
             model.DeletedUtc = null;
 
-            await _drinks.InsertOneAsync(model);
-            return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
+            try
+            {
+                await _drinks.InsertOneAsync(model, cancellationToken: ct);
+                return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
+            }
+            catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+            {
+                return Conflict("Duplicate key.");
+            }
         }
 
         // -------------------------------------------------------------
         // PUT: /api/v1/drinks/{id}
-        // Full/partial update using $set; preserves CreatedUtc.
+        // Full update. Preserves CreatedUtc.
         // -------------------------------------------------------------
         [Authorize(Roles = "Admin")]
         [HttpPut("{id:length(24)}")]
-        public async Task<IActionResult> Update(string id, [FromBody] Drink model)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Update(string id, [FromBody] Drink model, CancellationToken ct = default)
         {
-            if (!ObjectId.TryParse(id, out _)) return BadRequest("Invalid id format.");
+            if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
             if (model is null) return BadRequest("Body is required.");
+            if (model.BasePrice < 0) return BadRequest("BasePrice must be >= 0.");
+            if (!IsValidPercent(model.DefaultSugar)) return BadRequest("DefaultSugar must be 0,25,50,75,100.");
+            if (!IsValidPercent(model.DefaultIce)) return BadRequest("DefaultIce must be 0,25,50,75,100.");
 
             var update = Builders<Drink>.Update
                 .Set(d => d.Name, (model.Name ?? string.Empty).Trim())
-                .Set(d => d.Description, (model.Description ?? string.Empty).Trim())
+                .Set(d => d.Description, model.Description?.Trim() ?? string.Empty)
                 .Set(d => d.BasePrice, model.BasePrice)
                 .Set(d => d.SmallUpcharge, model.SmallUpcharge)
                 .Set(d => d.MediumUpcharge, model.MediumUpcharge)
@@ -120,7 +180,8 @@ namespace BobaShop.Api.Controllers
 
             var result = await _drinks.UpdateOneAsync(
                 d => d.Id == id && d.DeletedUtc == null,
-                update);
+                update,
+                cancellationToken: ct);
 
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
@@ -129,17 +190,24 @@ namespace BobaShop.Api.Controllers
         // PATCH: /api/v1/drinks/{id}/active
         // Toggle active flag only.
         // -------------------------------------------------------------
+        public sealed class SetActiveDto { public bool IsActive { get; set; } }
+
         [Authorize(Roles = "Admin")]
         [HttpPatch("{id:length(24)}/active")]
-        public async Task<IActionResult> SetActive(string id, [FromBody] bool isActive)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SetActive(string id, [FromBody] SetActiveDto body, CancellationToken ct = default)
         {
-            if (!ObjectId.TryParse(id, out _)) return BadRequest("Invalid id format.");
+            if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
+            if (body is null) return BadRequest("Body is required.");
 
             var result = await _drinks.UpdateOneAsync(
                 d => d.Id == id && d.DeletedUtc == null,
                 Builders<Drink>.Update
-                    .Set(d => d.IsActive, isActive)
-                    .Set(d => d.UpdatedUtc, DateTime.UtcNow));
+                    .Set(d => d.IsActive, body.IsActive)
+                    .Set(d => d.UpdatedUtc, DateTime.UtcNow),
+                cancellationToken: ct);
 
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
@@ -150,37 +218,51 @@ namespace BobaShop.Api.Controllers
         // -------------------------------------------------------------
         [Authorize(Roles = "Admin")]
         [HttpDelete("{id:length(24)}")]
-        public async Task<IActionResult> SoftDelete(string id)
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> SoftDelete(string id, CancellationToken ct = default)
         {
-            if (!ObjectId.TryParse(id, out _)) return BadRequest("Invalid id format.");
+            if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
 
             var result = await _drinks.UpdateOneAsync(
                 d => d.Id == id && d.DeletedUtc == null,
-                Builders<Drink>.Update.Set(d => d.DeletedUtc, DateTime.UtcNow));
+                Builders<Drink>.Update.Set(d => d.DeletedUtc, DateTime.UtcNow),
+                cancellationToken: ct);
 
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
 
         // -------------------------------------------------------------
         // POST: /api/v1/drinks/seed
-        // Quick seed for local testing. (Admin only)
+        // Seeds initial drinks (Debug: open; Release: Admin-only).
         // -------------------------------------------------------------
+#if DEBUG
+        [AllowAnonymous]
+#else
         [Authorize(Roles = "Admin")]
+#endif
         [HttpPost("seed")]
-        public async Task<ActionResult> Seed()
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> Seed(CancellationToken ct = default)
         {
-            var any = await _drinks.Find(d => true).Limit(1).AnyAsync();
-            if (any) return Ok(new { message = "Drinks already exist." });
+            var existing = await _drinks
+                .Find(d => d.DeletedUtc == null)
+                .Limit(1)
+                .AnyAsync(ct);
 
+            if (existing) return Ok(new { message = "Drinks already exist." });
+
+            var now = DateTime.UtcNow;
             var items = new[]
             {
-                new Drink { Name = "Classic Milk Tea", Description = "Black tea + milk", BasePrice = 6.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = DateTime.UtcNow },
-                new Drink { Name = "Brown Sugar Latte", Description = "Fresh milk + brown sugar syrup", BasePrice = 7.50m, DefaultSugar = 75, DefaultIce = 50, IsActive = true, CreatedUtc = DateTime.UtcNow },
-                new Drink { Name = "Taro Smoothie", Description = "Creamy taro blend", BasePrice = 8.00m, DefaultSugar = 50, DefaultIce = 0,  IsActive = true, CreatedUtc = DateTime.UtcNow },
-                new Drink { Name = "Matcha Latte", Description = "Japanese matcha + milk", BasePrice = 7.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = DateTime.UtcNow }
+                new Drink { Name = "Classic Milk Tea",  Description = "Black tea with milk",             BasePrice = 6.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Brown Sugar Latte", Description = "Fresh milk + brown sugar syrup",  BasePrice = 7.50m, DefaultSugar = 75, DefaultIce = 50, IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Taro Smoothie",     Description = "Creamy taro blend",               BasePrice = 8.00m, DefaultSugar = 50, DefaultIce = 0,  IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Matcha Latte",      Description = "Japanese matcha + milk",          BasePrice = 7.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now }
             };
 
-            await _drinks.InsertManyAsync(items);
+            await _drinks.InsertManyAsync(items, cancellationToken: ct);
             return Ok(new { inserted = items.Length });
         }
     }

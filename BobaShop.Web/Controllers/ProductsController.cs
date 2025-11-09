@@ -4,104 +4,153 @@
 // Student: Kate Odabas (P288004)
 // Date: November 2025
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
+// -----------------------------------------------------------------------------
 // Description:
-//   Presents the public product catalogue (menu) and product details pages.
-//   Uses an in-memory list of drinks for the web UI demo. Each product is
-//   represented by a ProductViewModel and image under /wwwroot/images.
-//   Demonstrates MVC routing, model binding to views, and clean controller
-//   actions returning strongly-typed view models.
+//   Controller responsible for displaying the drinks catalogue and product 
+//   details pages in the BoBaTastic web app.
+//
+//   - Calls BobaShop.Api through the IDrinksApi service (HttpClient).
+//   - Fetches real MongoDB data (no in-memory demo list).
+//   - Demonstrates MVC routing, dependency injection, async/await,
+//     and strongly-typed Razor views.
 // -----------------------------------------------------------------------------
 
 using Microsoft.AspNetCore.Mvc;
 using BobaShop.Web.Models;
+using BobaShop.Web.Services;
 using System.Linq;
-using System.Collections.Generic;
-using Microsoft.AspNetCore.Authorization;
+using System.Net.Http;
 
 namespace BobaShop.Web.Controllers
 {
-    // -------------------------------------------------------------------------
-    // Controller: ProductsController
-    // Purpose:
-    //   Public endpoints for browsing the drinks menu and viewing item details.
-    //   This controller does not require authentication (landing experience).
-    // Mapping: ICTPRG556 Controllers, views, and routing
-    // -------------------------------------------------------------------------
+    /// <summary>
+    /// Public controller that presents the drinks menu and details pages.
+    /// Fully accessible without authentication.
+    /// </summary>
     public class ProductsController : Controller
     {
-        // ---------------------------------------------------------------------
-        // In-memory menu for demo purposes
-        // Notes:
-        //   IDs are simple strings "1".."10" to keep the UI stable.
-        //   ImageUrl points to /wwwroot/images/*.jpg.
-        //   Price is used as the product's base price on the details page.
-        //   Keep this data aligned with API seed data for consistent UX.
-        // ---------------------------------------------------------------------
-        private static readonly List<ProductViewModel> Drinks = new()
-        {
-            new() { Id = "1",  Name = "Classic Milk Tea",            Price = 6.50m, ImageUrl = "/images/classic-milk-tea.jpg" },
-            new() { Id = "2",  Name = "Brown Sugar Boba",            Price = 7.00m, ImageUrl = "/images/brown-sugar-boba.jpg" },
-            new() { Id = "3",  Name = "Taro Milk Tea",               Price = 6.80m, ImageUrl = "/images/taro-milk-tea.jpg" },
-            new() { Id = "4",  Name = "Matcha Milk Tea",             Price = 7.00m, ImageUrl = "/images/matcha-milk-tea.jpg" },
-            new() { Id = "5",  Name = "Thai Milk Tea",               Price = 6.80m, ImageUrl = "/images/thai-milk-tea.jpg" },
-            new() { Id = "6",  Name = "Mango Green Tea",             Price = 6.20m, ImageUrl = "/images/mango-green-tea.jpg" },
-            new() { Id = "7",  Name = "Passionfruit Green Tea",      Price = 6.20m, ImageUrl = "/images/passionfruit-green-tea.jpg" },
-            new() { Id = "8",  Name = "Dirty Brown Sugar Cream Cap", Price = 7.50m, ImageUrl = "/images/dirty-brown-sugar-creamcap.jpg" },
-            new() { Id = "9",  Name = "Matcha Strawberry Latte",     Price = 7.80m, ImageUrl = "/images/matcha-strawberry-latte.jpg" },
-            new() { Id = "10", Name = "Oreo Cocoa Crush",            Price = 7.50m, ImageUrl = "/images/oreo-cocoa-crush.jpg" }
-        };
+        private readonly IDrinksApi _api;
+
+        /// <summary>
+        /// Inject the API client used to retrieve drinks.
+        /// </summary>
+        public ProductsController(IDrinksApi api) => _api = api;
 
         // =====================================================================
         // GET: /Products
-        // Purpose:
-        //   Friendly top-level route that redirects to the actual menu action.
-        //   Keeps URLs intuitive while allowing the menu view to live at /Menu.
+        // Friendly entry that redirects to /Products/Menu.
         // =====================================================================
         public IActionResult Index() => RedirectToAction(nameof(Menu));
 
         // =====================================================================
         // GET: /Products/Menu
-        // Purpose:
-        //   Displays the full drinks list. The view enumerates the list and
-        //   renders product cards linking to /Products/Details/{id}.
-        // View:
-        //   Views/Products/Menu.cshtml (strongly-typed: IEnumerable<ProductViewModel>)
+        // Fetch all drinks from the API and render cards on the Menu page.
+        // View: Views/Products/Menu.cshtml (IEnumerable<ProductViewModel>)
         // =====================================================================
-        public IActionResult Menu() => View(Drinks);
+        public async Task<IActionResult> Menu()
+        {
+            try
+            {
+                var drinks = await _api.GetAllAsync();
+
+                // Explicit lambda avoids Select(...) overload ambiguity.
+                var list = drinks.Select(d => MapToCard(d)).ToList();
+
+                return View(list);
+            }
+            catch (HttpRequestException ex)
+            {
+                // Friendly message if the API is unreachable.
+                ViewBag.Error = "Could not connect to the API: " + ex.Message;
+
+                // Optional: show a custom page if you’ve created Views/Products/ApiError.cshtml
+                // return View("ApiError");
+
+                return View(new List<ProductViewModel>());
+            }
+        }
 
         // =====================================================================
         // GET: /Products/Details/{id}
-        // Purpose:
-        //   Shows a single product with base price, hero image, and available
-        //   topping options. The returned ProductDetailsViewModel is used by
-        //   the view to post a Cart item (size/sugar/ice/toppings selection).
-        // View:
-        //   Views/Products/Details.cshtml 
+        // Load one drink by its MongoDB ObjectId and build a details view model.
+        // View: Views/Products/Details.cshtml (ProductDetailsViewModel)
         // =====================================================================
         [HttpGet]
-        public IActionResult Details(string id)
+        public async Task<IActionResult> Details(string id)
         {
-            var p = Drinks.FirstOrDefault(d => d.Id == id);
-            if (p is null) return NotFound();
-
-            var model = new ProductDetailsViewModel
+            // Guard: old demo links like /Products/Details/1
+            if (string.IsNullOrWhiteSpace(id) || id.Length != 24)
             {
-                Id = p.Id,
-                Name = p.Name,
-                ImageUrl = p.ImageUrl,
-                BasePrice = p.Price,
+                TempData["Alert"] = "That item is unavailable. Please choose a drink from the Menu.";
+                return RedirectToAction(nameof(Menu));
+            }
 
-                // Default set of toppings for the UI selector.
-                
-                Toppings = new()
+            try
+            {
+                var drink = await _api.GetByIdAsync(id);
+                if (drink is null)
+                    return NotFound();
+
+                var model = new ProductDetailsViewModel
                 {
-                    new ToppingOption { Code = "pearls",  Name = "Pearls",        Price = 0.80m },
-                    new ToppingOption { Code = "pudding", Name = "Egg Pudding",   Price = 0.90m },
-                    new ToppingOption { Code = "coconut", Name = "Coconut Jelly", Price = 1.00m }
-                }
-            };
+                    Id = drink.Id!,
+                    Name = drink.Name ?? "Unnamed drink",
+                    ImageUrl = GuessImage(drink.Name),
+                    BasePrice = drink.BasePrice,
 
-            return View(model);
+                    // Static toppings for the customisation selector.
+                    Toppings = new()
+                    {
+                        new ToppingOption { Code = "pearls",  Name = "Pearls",        Price = 0.80m },
+                        new ToppingOption { Code = "pudding", Name = "Egg Pudding",   Price = 0.90m },
+                        new ToppingOption { Code = "coconut", Name = "Coconut Jelly", Price = 1.00m }
+                    }
+                };
+
+                return View(model);
+            }
+            catch (HttpRequestException ex)
+            {
+                ViewBag.Error = "API request failed: " + ex.Message;
+
+                // Optional custom page; otherwise Shared/Error.cshtml will be used if you return View("Error")
+                // return View("ApiError");
+
+                return View("Error");
+            }
+        }
+
+        // =====================================================================
+        // Helper: Map API drink (DrinkVm) to the card model used by Menu.cshtml
+        // =====================================================================
+        private static ProductViewModel MapToCard(DrinkVm d) => new()
+        {
+            Id = d.Id ?? string.Empty,
+            Name = d.Name ?? "Unnamed drink",
+            Price = d.BasePrice,
+            ImageUrl = GuessImage(d.Name)
+        };
+
+        // =====================================================================
+        // Helper: Guess an image path based on drink name to match /wwwroot/images
+        // =====================================================================
+        private static string GuessImage(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return "/images/classic-milk-tea.jpg";
+
+            var n = name.ToLowerInvariant();
+
+            if (n.Contains("brown") && n.Contains("sugar")) return "/images/brown-sugar-boba.jpg";
+            if (n.Contains("taro")) return "/images/taro-milk-tea.jpg";
+            if (n.Contains("matcha") && n.Contains("strawberry")) return "/images/matcha-strawberry-latte.jpg";
+            if (n.Contains("matcha")) return "/images/matcha-milk-tea.jpg";
+            if (n.Contains("thai")) return "/images/thai-milk-tea.jpg";
+            if (n.Contains("mango")) return "/images/mango-green-tea.jpg";
+            if (n.Contains("passion")) return "/images/passionfruit-green-tea.jpg";
+            if (n.Contains("oreo") || n.Contains("cocoa")) return "/images/oreo-cocoa-crush.jpg";
+
+            return "/images/classic-milk-tea.jpg";
         }
     }
 }
