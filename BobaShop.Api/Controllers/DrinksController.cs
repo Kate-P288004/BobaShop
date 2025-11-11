@@ -1,15 +1,14 @@
 ﻿// -----------------------------------------------------------------------------
 // File: DrinksController.cs
-// Project: BobaShop.Api
+// Project: BobaShop.Api (BoBatastic)
 // Student: Kate Odabas (P288004)
-// Date: October 2025
-// Assessment: Diploma of IT – Application Development Project
+// Date: November 2025
+// Assessment: AT2 – MVC & NoSQL Project
 // Description:
-//   API v1 controller providing CRUD endpoints for managing drinks in MongoDB.
-//   - Versioning (Asp.Versioning) => /api/v1/drinks
-//   - Magic Three Dates: CreatedUtc, UpdatedUtc, DeletedUtc (soft delete)
-//   - Read: [AllowAnonymous]
-//   - Write: [Authorize(Roles = "Admin")]
+//   API v1 controller for drinks (MongoDB).
+//   Read endpoints are open; write endpoints require Admin.
+//   Uses soft delete via DeletedUtc and keeps CreatedUtc/UpdatedUtc in sync.
+//   Route: /api/v1/Drinks
 // -----------------------------------------------------------------------------
 
 using Asp.Versioning;
@@ -19,13 +18,16 @@ using BobaShop.Api.Data;
 using BobaShop.Api.Models;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using ApiVersionAttribute = Asp.Versioning.ApiVersionAttribute;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace BobaShop.Api.Controllers
 {
     [ApiController]
-    [Asp.Versioning.ApiVersion("1.0")]
+    [ApiVersion(1.0)]
     [Route("api/v{version:apiVersion}/[controller]")]
+    [Produces("application/json")]
+    // Force Bearer auth on this controller; reads will opt out with [AllowAnonymous]
+    [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme, Policy = "RequireAdmin")]
     public class DrinksController : ControllerBase
     {
         private readonly IMongoCollection<Drink> _drinks;
@@ -39,10 +41,10 @@ namespace BobaShop.Api.Controllers
         private static bool IsValidObjectId(string id) => ObjectId.TryParse(id, out _);
         private static bool IsValidPercent(int? v) => v is null || v is 0 or 25 or 50 or 75 or 100;
 
-        // -------------------------------------------------------------
-        // GET: /api/v1/drinks?name=milk&active=true&min=5&max=9&sort=name&dir=asc&skip=0&take=20
-        // Returns: 200 OK + list; X-Total-Count header for client paging.
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // GET /api/v1/Drinks?name=milk&active=true&min=5&max=9&sort=name&dir=asc&skip=0&take=20
+        // Returns 200 with items and X-Total-Count header for paging.
+        // ---------------------------------------------------------------------
         [AllowAnonymous]
         [HttpGet]
         [ProducesResponseType(typeof(List<Drink>), StatusCodes.Status200OK)]
@@ -72,13 +74,12 @@ namespace BobaShop.Api.Controllers
             if (max.HasValue) filter &= Builders<Drink>.Filter.Lte(d => d.BasePrice, max.Value);
 
             var countTask = _drinks.CountDocumentsAsync(filter, cancellationToken: ct);
-
-            IFindFluent<Drink, Drink> query = _drinks.Find(filter);
+            var query = _drinks.Find(filter);
 
             // Sort
             sort = sort?.Trim().ToLowerInvariant();
             dir = dir?.Trim().ToLowerInvariant();
-            var ascending = dir is not "desc";
+            var ascending = dir != "desc";
 
             query = sort switch
             {
@@ -96,9 +97,9 @@ namespace BobaShop.Api.Controllers
             return Ok(items);
         }
 
-        // -------------------------------------------------------------
-        // GET: /api/v1/drinks/{id}
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // GET /api/v1/Drinks/{id}
+        // ---------------------------------------------------------------------
         [AllowAnonymous]
         [HttpGet("{id:length(24)}")]
         [ProducesResponseType(typeof(Drink), StatusCodes.Status200OK)]
@@ -115,14 +116,13 @@ namespace BobaShop.Api.Controllers
             return drink is null ? NotFound() : Ok(drink);
         }
 
-        // -------------------------------------------------------------
-        // POST: /api/v1/drinks
-        // Create a new drink.
-        // -------------------------------------------------------------
-        [Authorize(Roles = "Admin")]
+        // ---------------------------------------------------------------------
+        // POST /api/v1/Drinks  (Admin)
+        // ---------------------------------------------------------------------
         [HttpPost]
         [ProducesResponseType(typeof(Drink), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> Create([FromBody] Drink model, CancellationToken ct = default)
         {
             if (model is null) return BadRequest("Body is required.");
@@ -141,7 +141,7 @@ namespace BobaShop.Api.Controllers
             try
             {
                 await _drinks.InsertOneAsync(model, cancellationToken: ct);
-                return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
+                return CreatedAtAction(nameof(GetById), new { id = model.Id, version = "1.0" }, model);
             }
             catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
             {
@@ -149,11 +149,9 @@ namespace BobaShop.Api.Controllers
             }
         }
 
-        // -------------------------------------------------------------
-        // PUT: /api/v1/drinks/{id}
-        // Full update. Preserves CreatedUtc.
-        // -------------------------------------------------------------
-        [Authorize(Roles = "Admin")]
+        // ---------------------------------------------------------------------
+        // PUT /api/v1/Drinks/{id}  (Admin)
+        // ---------------------------------------------------------------------
         [HttpPut("{id:length(24)}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -162,12 +160,13 @@ namespace BobaShop.Api.Controllers
         {
             if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
             if (model is null) return BadRequest("Body is required.");
+            if (string.IsNullOrWhiteSpace(model.Name)) return BadRequest("Name is required.");
             if (model.BasePrice < 0) return BadRequest("BasePrice must be >= 0.");
             if (!IsValidPercent(model.DefaultSugar)) return BadRequest("DefaultSugar must be 0,25,50,75,100.");
             if (!IsValidPercent(model.DefaultIce)) return BadRequest("DefaultIce must be 0,25,50,75,100.");
 
             var update = Builders<Drink>.Update
-                .Set(d => d.Name, (model.Name ?? string.Empty).Trim())
+                .Set(d => d.Name, model.Name.Trim())
                 .Set(d => d.Description, model.Description?.Trim() ?? string.Empty)
                 .Set(d => d.BasePrice, model.BasePrice)
                 .Set(d => d.SmallUpcharge, model.SmallUpcharge)
@@ -186,18 +185,16 @@ namespace BobaShop.Api.Controllers
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
 
-        // -------------------------------------------------------------
-        // PATCH: /api/v1/drinks/{id}/active
-        // Toggle active flag only.
-        // -------------------------------------------------------------
-        public sealed class SetActiveDto { public bool IsActive { get; set; } }
+        // ---------------------------------------------------------------------
+        // PATCH /api/v1/Drinks/{id}/active  (Admin)
+        // ---------------------------------------------------------------------
+        public sealed class DrinkSetActiveDto { public bool IsActive { get; set; } }
 
-        [Authorize(Roles = "Admin")]
         [HttpPatch("{id:length(24)}/active")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> SetActive(string id, [FromBody] SetActiveDto body, CancellationToken ct = default)
+        public async Task<IActionResult> SetActive(string id, [FromBody] DrinkSetActiveDto body, CancellationToken ct = default)
         {
             if (!IsValidObjectId(id)) return BadRequest("Invalid id format.");
             if (body is null) return BadRequest("Body is required.");
@@ -212,11 +209,9 @@ namespace BobaShop.Api.Controllers
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
 
-        // -------------------------------------------------------------
-        // DELETE: /api/v1/drinks/{id}
-        // Soft delete by setting DeletedUtc timestamp.
-        // -------------------------------------------------------------
-        [Authorize(Roles = "Admin")]
+        // ---------------------------------------------------------------------
+        // DELETE /api/v1/Drinks/{id}  (Admin)
+        // ---------------------------------------------------------------------
         [HttpDelete("{id:length(24)}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -233,14 +228,12 @@ namespace BobaShop.Api.Controllers
             return result.MatchedCount == 0 ? NotFound() : NoContent();
         }
 
-        // -------------------------------------------------------------
-        // POST: /api/v1/drinks/seed
-        // Seeds initial drinks (Debug: open; Release: Admin-only).
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // POST /api/v1/Drinks/seed
+        // In Debug builds, open for convenience. In Release, Admin only.
+        // ---------------------------------------------------------------------
 #if DEBUG
         [AllowAnonymous]
-#else
-        [Authorize(Roles = "Admin")]
 #endif
         [HttpPost("seed")]
         [ProducesResponseType(StatusCodes.Status200OK)]
@@ -256,10 +249,10 @@ namespace BobaShop.Api.Controllers
             var now = DateTime.UtcNow;
             var items = new[]
             {
-                new Drink { Name = "Classic Milk Tea",  Description = "Black tea with milk",             BasePrice = 6.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now },
-                new Drink { Name = "Brown Sugar Latte", Description = "Fresh milk + brown sugar syrup",  BasePrice = 7.50m, DefaultSugar = 75, DefaultIce = 50, IsActive = true, CreatedUtc = now },
-                new Drink { Name = "Taro Smoothie",     Description = "Creamy taro blend",               BasePrice = 8.00m, DefaultSugar = 50, DefaultIce = 0,  IsActive = true, CreatedUtc = now },
-                new Drink { Name = "Matcha Latte",      Description = "Japanese matcha + milk",          BasePrice = 7.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now }
+                new Drink { Name = "Classic Milk Tea",  Description = "Black tea with milk",            BasePrice = 6.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Brown Sugar Latte", Description = "Fresh milk and brown sugar",     BasePrice = 7.50m, DefaultSugar = 75, DefaultIce = 50, IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Taro Smoothie",     Description = "Creamy taro blend",              BasePrice = 8.00m, DefaultSugar = 50, DefaultIce = 0,  IsActive = true, CreatedUtc = now },
+                new Drink { Name = "Matcha Latte",      Description = "Japanese matcha with milk",      BasePrice = 7.00m, DefaultSugar = 50, DefaultIce = 50, IsActive = true, CreatedUtc = now }
             };
 
             await _drinks.InsertManyAsync(items, cancellationToken: ct);

@@ -11,9 +11,6 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Http.Headers;
-using System.IO;
-using Microsoft.AspNetCore.Http;
-
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +39,7 @@ var identityCs = BuildIdentityConnection(builder);
 builder.Services.AddDbContext<ApplicationDbContext>(opts =>
     opts.UseSqlite(identityCs));
 
+// Persist data protection keys
 var keysPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
     "BobaShop", "keys");
@@ -99,8 +97,17 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IRewardsService, RewardsService>();
 
 // -----------------------------------------------------------------------------
-// 6) API CLIENT (HttpClient for BobaShop.Api)
+// 6) API AUTH + HTTP CLIENTS
 // -----------------------------------------------------------------------------
+builder.Services.AddMemoryCache();
+
+// Baseline client factory for ApiAuthService
+builder.Services.AddHttpClient();
+
+// ApiAuthService should be scoped so each request gets a fresh auth header while still using the cache
+builder.Services.AddScoped<IApiAuthService, ApiAuthService>();
+
+// Optional typed client example for other API calls that do not need auth service
 builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
 {
     var apiBase = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
@@ -109,21 +116,29 @@ builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
     client.DefaultRequestHeaders.Accept.Add(
         new MediaTypeWithQualityHeaderValue("application/json"));
 })
-.SetHandlerLifetime(TimeSpan.FromMinutes(5)); // optional; built-in
+.SetHandlerLifetime(TimeSpan.FromMinutes(5));
 
 // -----------------------------------------------------------------------------
 // 7) IDENTITY SEEDER (Roles + Admin user)
 // -----------------------------------------------------------------------------
 builder.Services.AddScoped<IdentitySeeder>();
 
+// -----------------------------------------------------------------------------
+// 7.5) AUTHORIZATION POLICIES
+// -----------------------------------------------------------------------------
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
+});
+
 var app = builder.Build();
 
-// Log important paths after Build()
+// Log important paths and urls
 app.Logger.LogInformation("Identity DB: {cs}", identityCs);
 app.Logger.LogInformation("API BaseUrl: {api}", app.Configuration["Api:BaseUrl"]);
 
 // -----------------------------------------------------------------------------
-// 8) APPLY MIGRATIONS + SEED ROLES/ADMIN
+// 8) APPLY MIGRATIONS + SEED ROLES AND ADMIN
 // -----------------------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
@@ -157,6 +172,12 @@ app.UseSession();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Areas route for Admin
+app.MapControllerRoute(
+    name: "areas",
+    pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
+// Default route
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
@@ -164,7 +185,7 @@ app.MapControllerRoute(
 app.Run();
 
 // -----------------------------------------------------------------------------
-// Identity Seeder (creates roles + admin on startup)
+// Identity Seeder (creates roles and admin on startup)
 // -----------------------------------------------------------------------------
 public class IdentitySeeder
 {

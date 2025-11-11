@@ -7,13 +7,13 @@
 // Description:
 //   Entry point for the BoBatastic API.
 //   Configures MongoDB, ASP.NET Identity on SQLite, JWT auth, API Versioning,
-//   Swagger with Bearer, CORS, ProblemDetails, and Mongo seeding.
+//   Swagger with Bearer support, CORS, ProblemDetails, and Mongo seeding.
 // -----------------------------------------------------------------------------
 
 using Asp.Versioning;
 using Asp.Versioning.ApiExplorer;
 using BobaShop.Api.Data;
-using BobaShop.Api.Identity;     // ApplicationUser, AppIdentityDbContext
+using BobaShop.Api.Identity;
 using BobaShop.Api.Models;
 using BobaShop.Api.Seed;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,20 +25,20 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
 // -----------------------------------------------------------------------------
-// Helpers
+// Helper: build an absolute SQLite connection string for Identity
 // -----------------------------------------------------------------------------
 static string BuildIdentityConnection(WebApplicationBuilder b)
 {
-    // Read from appsettings ConnectionStrings:IdentityConnection or default to local file
-    var raw = b.Configuration.GetConnectionString("IdentityConnection") ?? "Data Source=identity.db";
-
+    var raw = b.Configuration.GetConnectionString("IdentityDb") ?? "Data Source=identity.db";
     const string prefix = "Data Source=";
+
     if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
     {
         var file = raw[prefix.Length..].Trim();
@@ -52,18 +52,16 @@ static string BuildIdentityConnection(WebApplicationBuilder b)
 }
 
 // -----------------------------------------------------------------------------
-// 1) MongoDB
+// 1) MongoDB configuration and context
 // -----------------------------------------------------------------------------
 builder.Services.Configure<MongoSettings>(config.GetSection("Mongo"));
 builder.Services.AddSingleton<MongoDbContext>();
 
 // -----------------------------------------------------------------------------
-// 2) ASP.NET Identity on SQLite
+// 2) ASP.NET Identity on SQLite (with roles)
 // -----------------------------------------------------------------------------
 var identityCs = BuildIdentityConnection(builder);
-
-builder.Services.AddDbContext<AppIdentityDbContext>(opts =>
-    opts.UseSqlite(identityCs));
+builder.Services.AddDbContext<AppIdentityDbContext>(opts => opts.UseSqlite(identityCs));
 
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(opt =>
@@ -80,10 +78,7 @@ builder.Services
 // 3) Controllers + JSON
 // -----------------------------------------------------------------------------
 builder.Services.AddControllers()
-    .AddJsonOptions(_ =>
-    {
-        
-    });
+    .AddJsonOptions(_ => { });
 
 // -----------------------------------------------------------------------------
 // 4) API Versioning
@@ -103,25 +98,17 @@ builder.Services.AddApiVersioning(options =>
 // -----------------------------------------------------------------------------
 // 5) JWT Authentication
 // -----------------------------------------------------------------------------
-var jwt = config.GetSection("Jwt");
-var jwtKey = jwt["Key"];
-var jwtIssuer = jwt["Issuer"];
-var jwtAudience = jwt["Audience"];
-
+var jwtSection = config.GetSection("Jwt");
+var jwtKey = jwtSection["Key"];
+var jwtIssuer = string.IsNullOrWhiteSpace(jwtSection["Issuer"]) ? "BobaShop.Api" : jwtSection["Issuer"];
+var jwtAudience = string.IsNullOrWhiteSpace(jwtSection["Audience"]) ? "BobaShop.Api" : jwtSection["Audience"];
 
 if (string.IsNullOrWhiteSpace(jwtKey))
 {
     jwtKey = "DEV_ONLY_replace_me_with_long_random_secret_!234567890";
-    builder.Logging.AddConsole();
-    builder.Services.AddLogging(); 
-
-    builder.Logging.ClearProviders();
     var tempLogger = LoggerFactory.Create(x => x.AddConsole()).CreateLogger("BobaShop.Api");
     tempLogger.LogWarning("Jwt:Key not set. Using a development fallback key.");
-
 }
-if (string.IsNullOrWhiteSpace(jwtIssuer)) jwtIssuer = "BobaShop.Api";
-if (string.IsNullOrWhiteSpace(jwtAudience)) jwtAudience = "BobaShop.Clients";
 
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
@@ -133,23 +120,41 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
+        options.IncludeErrorDetails = true; // helpful during setup
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = jwtIssuer,
+
             ValidateAudience = true,
             ValidAudience = jwtAudience,
+
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = signingKey,
+
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(2)
+            ClockSkew = TimeSpan.FromMinutes(2),
+
+            // Map standard role/name claims so [Authorize(Roles="Admin")] works
+            RoleClaimType = ClaimTypes.Role,
+            NameClaimType = ClaimTypes.Name
         };
     });
 
-builder.Services.AddAuthorization();
+// -----------------------------------------------------------------------------
+// 6) Authorization policies
+// -----------------------------------------------------------------------------
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAdmin", p =>
+    {
+        p.RequireAuthenticatedUser();
+        p.RequireRole("Admin");
+    });
+});
 
 // -----------------------------------------------------------------------------
-// 6) Swagger / OpenAPI (always enabled)
+// 7) Swagger / OpenAPI with Bearer
 // -----------------------------------------------------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -159,13 +164,6 @@ builder.Services.AddSwaggerGen(options =>
         Title = "BoBatastic API v1",
         Version = "v1",
         Description = "Core CRUD endpoints for drinks, toppings, and orders."
-    });
-
-    options.SwaggerDoc("v2", new OpenApiInfo
-    {
-        Title = "BoBatastic API v2",
-        Version = "v2",
-        Description = "Demonstrates API versioning for assessment evidence."
     });
 
     var bearerScheme = new OpenApiSecurityScheme
@@ -183,32 +181,18 @@ builder.Services.AddSwaggerGen(options =>
         }
     };
 
-    // Register security definition
     options.AddSecurityDefinition("Bearer", bearerScheme);
-
-    // Register security requirement (so all endpoints show the lock icon)
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-            Array.Empty<string>()
-        }
+        { bearerScheme, Array.Empty<string>() }
     });
 });
 
 // -----------------------------------------------------------------------------
-// 7) CORS
+// 8) CORS
 // -----------------------------------------------------------------------------
 const string CorsPolicyName = "BoBaCors";
-string[] allowedOrigins =
-    config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+var allowedOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 
 builder.Services.AddCors(options =>
 {
@@ -219,92 +203,114 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod();
-            // Do not call AllowCredentials with wildcard origins
+            // Do NOT call .AllowCredentials() when using bearer tokens unless you truly need cookies
         }
         else
         {
             policy.AllowAnyOrigin()
                   .AllowAnyHeader()
-                  .AllowAnyMethod(); // Dev fallback
+                  .AllowAnyMethod();
         }
     });
 });
 
 // -----------------------------------------------------------------------------
-// 8) ProblemDetails
+// 9) ProblemDetails
 // -----------------------------------------------------------------------------
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
 // -----------------------------------------------------------------------------
-// 9) Log Identity connection and ensure migrations
+// 10) Ensure Identity DB migrations + seed default roles + admin user
 // -----------------------------------------------------------------------------
-app.Logger.LogInformation("IdentityConnection: {cs}", identityCs);
+app.Logger.LogInformation("Identity DB connection: {cs}", identityCs);
 
 using (var scope = app.Services.CreateScope())
 {
     var idDb = scope.ServiceProvider.GetRequiredService<AppIdentityDbContext>();
+    await idDb.Database.MigrateAsync();
 
+    var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var cfg = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+    if (!await roleMgr.RoleExistsAsync("Admin"))
+        await roleMgr.CreateAsync(new IdentityRole("Admin"));
+
+    var email = cfg["Admin:Email"];
+    var password = cfg["Admin:Password"];
+    var fullName = cfg["Admin:FullName"];
+    var role = cfg["Admin:Role"] ?? "Admin";
+
+    if (!string.IsNullOrWhiteSpace(email) && !string.IsNullOrWhiteSpace(password))
+    {
+        var admin = await userMgr.FindByEmailAsync(email);
+        if (admin == null)
+        {
+            admin = new ApplicationUser { UserName = email, Email = email, FullName = fullName, EmailConfirmed = true };
+            var created = await userMgr.CreateAsync(admin, password);
+            if (!created.Succeeded)
+            {
+                app.Logger.LogError("Failed to create admin user: {errs}",
+                    string.Join(", ", created.Errors.Select(e => e.Description)));
+            }
+        }
+
+        if (!await roleMgr.RoleExistsAsync(role))
+            await roleMgr.CreateAsync(new IdentityRole(role));
+
+        if (admin != null && !await userMgr.IsInRoleAsync(admin, role))
+        {
+            var added = await userMgr.AddToRoleAsync(admin, role);
+            if (!added.Succeeded)
+                app.Logger.LogError("Failed to add role '{role}' to admin user {email}: {errs}",
+                    role, email, string.Join(", ", added.Errors.Select(e => e.Description)));
+            else
+                app.Logger.LogInformation("Ensured admin user {email} has role {role}.", email, role);
+        }
+
+        // Optional: seed a service user for the Web app
+        var svcEmail = cfg["Api:ServiceUser:Email"];
+        var svcPassword = cfg["Api:ServiceUser:Password"];
+        if (!string.IsNullOrWhiteSpace(svcEmail) && !string.IsNullOrWhiteSpace(svcPassword))
+        {
+            var svcUser = await userMgr.FindByEmailAsync(svcEmail);
+            if (svcUser == null)
+            {
+                svcUser = new ApplicationUser { UserName = svcEmail, Email = svcEmail, FullName = "API Service User", EmailConfirmed = true };
+                var createdSvc = await userMgr.CreateAsync(svcUser, svcPassword);
+                if (!createdSvc.Succeeded)
+                    app.Logger.LogError("Failed to create service user: {errs}", string.Join(", ", createdSvc.Errors.Select(e => e.Description)));
+            }
+            if (svcUser != null && !await userMgr.IsInRoleAsync(svcUser, "Admin"))
+            {
+                var addedSvc = await userMgr.AddToRoleAsync(svcUser, "Admin");
+                if (!addedSvc.Succeeded)
+                    app.Logger.LogError("Failed to add Admin to service user: {errs}", string.Join(", ", addedSvc.Errors.Select(e => e.Description)));
+            }
+        }
+    }
+
+    // Log DB file location
     var cs = idDb.Database.GetDbConnection().ConnectionString;
     var sb = new SqliteConnectionStringBuilder(cs);
     var dbFile = sb.DataSource ?? "identity.db";
     var absPath = Path.IsPathRooted(dbFile)
         ? dbFile
         : Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, dbFile));
-
     app.Logger.LogInformation("Identity DB file: {absPath}", absPath);
-
-    await idDb.Database.MigrateAsync();
-
-    // Seed roles and a demo admin if missing
-    var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-    var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-    if (!await roleMgr.RoleExistsAsync("Customer"))
-        await roleMgr.CreateAsync(new IdentityRole("Customer"));
-    if (!await roleMgr.RoleExistsAsync("Admin"))
-        await roleMgr.CreateAsync(new IdentityRole("Admin"));
-
-    const string adminEmail = "admin@bobatastic.local";
-    var admin = await userMgr.FindByEmailAsync(adminEmail);
-    if (admin == null)
-    {
-        admin = new ApplicationUser { UserName = adminEmail, Email = adminEmail, FullName = "Demo Admin" };
-        var created = await userMgr.CreateAsync(admin, "Admin123$");
-        if (created.Succeeded)
-            await userMgr.AddToRoleAsync(admin, "Admin");
-    }
 }
 
 // -----------------------------------------------------------------------------
-// 10) Middleware pipeline
+// 11) Middleware pipeline (order matters)
 // -----------------------------------------------------------------------------
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        var factory = context.RequestServices.GetRequiredService<ProblemDetailsFactory>();
-        var problem = factory.CreateProblemDetails(
-            context,
-            statusCode: StatusCodes.Status500InternalServerError,
-            title: "An unexpected error occurred.",
-            detail: "Please try again or contact support if the issue persists."
-        );
-
-        context.Response.StatusCode = problem.Status ?? StatusCodes.Status500InternalServerError;
-        context.Response.ContentType = "application/problem+json";
-        await context.Response.WriteAsJsonAsync(problem);
-    });
-});
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI(o =>
     {
         o.SwaggerEndpoint("/swagger/v1/swagger.json", "BoBatastic API v1");
-        o.SwaggerEndpoint("/swagger/v2/swagger.json", "BoBatastic API v2");
     });
 }
 
@@ -312,39 +318,27 @@ app.UseHttpsRedirection();
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
-// ============================================================================
-// 11) Mongo seeding + index creation -----------------------------------------
-// ============================================================================
+
+// -----------------------------------------------------------------------------
+// 12) MongoDB seeding
+// -----------------------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
     var ctx = scope.ServiceProvider.GetRequiredService<MongoDbContext>();
     try
     {
-        // Run seeding and index setup
         DatabaseSeeder.Seed(ctx);
         IndexConfigurator.EnsureIndexes(ctx);
 
-        // Resolve connection string from options 
         var mongoOpts = scope.ServiceProvider.GetRequiredService<IOptions<MongoSettings>>().Value;
         var conn = mongoOpts?.ConnectionString ?? "(no ConnectionString)";
-
-        // Get the drinks collection and derive DB name from it
-        var col = ctx.Drinks; 
+        var col = ctx.Drinks;
         var dbName = col.Database.DatabaseNamespace.DatabaseName;
+        var count = await col.CountDocumentsAsync(Builders<Drink>.Filter.Empty);
 
-        // Count using empty filter (correct driver API)
-        var before = await col.CountDocumentsAsync(Builders<Drink>.Filter.Empty);
-
-        app.Logger.LogInformation("Mongo target => {conn} | DB={db} | Drinks(before)={before}",
-            conn, dbName, before);
-
-        // Idempotent seeding again 
-        DatabaseSeeder.Seed(ctx);
-
-        var after = await col.CountDocumentsAsync(Builders<Drink>.Filter.Empty);
-        app.Logger.LogInformation("Mongo seeded => Drinks(after)={after}", after);
+        app.Logger.LogInformation("Mongo target => {conn} | DB={db} | Drinks(count)={count}",
+            conn, dbName, count);
     }
     catch (Exception ex)
     {
@@ -352,10 +346,8 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-
-
 // -----------------------------------------------------------------------------
-// 12) Run
+// 13) Run API
 // -----------------------------------------------------------------------------
 app.Run();
 

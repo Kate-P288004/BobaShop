@@ -1,18 +1,24 @@
-﻿// -----------------------------------------------------------------------------
-// File: Models/DrinkVm.cs
-// Project: BobaShop.Web
-// Student: Kate Odabas (P288004)
-// Date: November 2025
-// Purpose:
-//   Represents a simplified version of the Drink object returned by the API.
-// -----------------------------------------------------------------------------
+﻿namespace BobaShop.Web.Models;
 
-namespace BobaShop.Web.Models
+public class DrinkVm
 {
-    public class DrinkVm
-    {
-        public string? Id { get; set; }
-        public string? Name { get; set; }
-        public decimal BasePrice { get; set; }
-    }
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? Description { get; set; }
+
+    public decimal BasePrice { get; set; }
+
+    // NEW: size upcharges (match API model)
+    public decimal SmallUpcharge { get; set; }
+    public decimal MediumUpcharge { get; set; }
+    public decimal LargeUpcharge { get; set; }
+
+    // NEW: defaults (match API model)
+    public int DefaultSugar { get; set; }
+    public int DefaultIce { get; set; }
+
+    public bool IsActive { get; set; }
+
+    public DateTime? CreatedUtc { get; set; }
+    public DateTime? UpdatedUtc { get; set; }
 }

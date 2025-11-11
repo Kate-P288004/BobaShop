@@ -1,0 +1,76 @@
+﻿@model BobaShop.Web.Models.EditDrinkVm
+@{
+    ViewData["Title"] = "Edit Product";
+    var id = (string?)ViewBag.DrinkId ?? "";
+}
+
+<h1>Edit Product</h1>
+
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger">@err</div>
+}
+
+<form asp-action="Edit" asp-route-id="@id" method="post">
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+        <span asp-validation-for="Name" class="text-danger"></span>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <label asp-for="BasePrice" class="form-label"></label>
+            <input asp-for="BasePrice" class="form-control" />
+            <span asp-validation-for="BasePrice" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="SmallUpcharge" class="form-label"></label>
+            <input asp-for="SmallUpcharge" class="form-control" />
+            <span asp-validation-for="SmallUpcharge" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="MediumUpcharge" class="form-label"></label>
+            <input asp-for="MediumUpcharge" class="form-control" />
+            <span asp-validation-for="MediumUpcharge" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="row g-3 mt-0">
+        <div class="col-md-4">
+            <label asp-for="LargeUpcharge" class="form-label"></label>
+            <input asp-for="LargeUpcharge" class="form-control" />
+            <span asp-validation-for="LargeUpcharge" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="DefaultSugar" class="form-label"></label>
+            <input asp-for="DefaultSugar" class="form-control" />
+            <div class="form-text">Use 0, 25, 50, 75, or 100.</div>
+            <span asp-validation-for="DefaultSugar" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="DefaultIce" class="form-label"></label>
+            <input asp-for="DefaultIce" class="form-control" />
+            <div class="form-text">Use 0, 25, 50, 75, or 100.</div>
+            <span asp-validation-for="DefaultIce" class="text-danger"></span>
+        </div>
+    </div>
+
+    <div class="mb-3 mt-3">
+        <label asp-for="Description" class="form-label"></label>
+        <textarea asp-for="Description" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="IsActive" class="form-check-input" />
+        <label asp-for="IsActive" class="form-check-label"></label>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Save changes</button>
+    <a asp-area="Admin" asp-controller="Products" asp-action="Index" class="btn btn-secondary">Cancel</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
