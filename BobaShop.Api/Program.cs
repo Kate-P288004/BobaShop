@@ -82,7 +82,7 @@ builder.Services
 builder.Services.AddControllers()
     .AddJsonOptions(_ =>
     {
-        // Keep defaults for now to match Web client expectations
+        
     });
 
 // -----------------------------------------------------------------------------
@@ -108,13 +108,12 @@ var jwtKey = jwt["Key"];
 var jwtIssuer = jwt["Issuer"];
 var jwtAudience = jwt["Audience"];
 
-// Dev fallback so startup does not explode if appsettings is missing.
-// Change Key in appsettings for real use.
+
 if (string.IsNullOrWhiteSpace(jwtKey))
 {
     jwtKey = "DEV_ONLY_replace_me_with_long_random_secret_!234567890";
-    builder.Logging.AddConsole(); // optional: ensures console logging
-    builder.Services.AddLogging(); // optional: ensure logging services
+    builder.Logging.AddConsole();
+    builder.Services.AddLogging(); 
 
     builder.Logging.ClearProviders();
     var tempLogger = LoggerFactory.Create(x => x.AddConsole()).CreateLogger("BobaShop.Api");
@@ -150,7 +149,7 @@ builder.Services
 builder.Services.AddAuthorization();
 
 // -----------------------------------------------------------------------------
-// 6) Swagger / OpenAPI
+// 6) Swagger / OpenAPI (always enabled)
 // -----------------------------------------------------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -159,28 +158,48 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "BoBatastic API v1",
         Version = "v1",
-        Description = "Version 1 – Core CRUD endpoints for drinks, toppings, and orders."
+        Description = "Core CRUD endpoints for drinks, toppings, and orders."
     });
+
     options.SwaggerDoc("v2", new OpenApiInfo
     {
         Title = "BoBatastic API v2",
         Version = "v2",
-        Description = "Version 2 – Demonstrates API versioning for AT2 evidence."
+        Description = "Demonstrates API versioning for assessment evidence."
     });
 
-    var bearer = new OpenApiSecurityScheme
+    var bearerScheme = new OpenApiSecurityScheme
     {
         Name = "Authorization",
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter: Bearer {your_token}"
+        Description = "Enter: Bearer {token}",
+        Reference = new OpenApiReference
+        {
+            Type = ReferenceType.SecurityScheme,
+            Id = "Bearer"
+        }
     };
-    options.AddSecurityDefinition("Bearer", bearer);
+
+    // Register security definition
+    options.AddSecurityDefinition("Bearer", bearerScheme);
+
+    // Register security requirement (so all endpoints show the lock icon)
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
-        { bearer, Array.Empty<string>() }
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
 
@@ -307,12 +326,12 @@ using (var scope = app.Services.CreateScope())
         DatabaseSeeder.Seed(ctx);
         IndexConfigurator.EnsureIndexes(ctx);
 
-        // Resolve connection string from options (if present)
+        // Resolve connection string from options 
         var mongoOpts = scope.ServiceProvider.GetRequiredService<IOptions<MongoSettings>>().Value;
         var conn = mongoOpts?.ConnectionString ?? "(no ConnectionString)";
 
         // Get the drinks collection and derive DB name from it
-        var col = ctx.Drinks; // if you don't have .Drinks, use: ctx.GetCollection<Drink>("Drinks")
+        var col = ctx.Drinks; 
         var dbName = col.Database.DatabaseNamespace.DatabaseName;
 
         // Count using empty filter (correct driver API)
@@ -321,7 +340,7 @@ using (var scope = app.Services.CreateScope())
         app.Logger.LogInformation("Mongo target => {conn} | DB={db} | Drinks(before)={before}",
             conn, dbName, before);
 
-        // Idempotent seeding again (safe if your seeder uses upserts)
+        // Idempotent seeding again 
         DatabaseSeeder.Seed(ctx);
 
         var after = await col.CountDocumentsAsync(Builders<Drink>.Filter.Empty);
