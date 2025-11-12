@@ -15,13 +15,13 @@ using System.Net.Http.Headers;
 var builder = WebApplication.CreateBuilder(args);
 
 // -----------------------------------------------------------------------------
-// 1) DATABASE (SQLite for Identity) — build absolute path to identity.db
+// 1) DATABASE (SQLite for Identity) — absolute path to identity.db
 // -----------------------------------------------------------------------------
-string BuildIdentityConnection(WebApplicationBuilder b)
+static string BuildIdentityConnection(WebApplicationBuilder b)
 {
     var raw = b.Configuration.GetConnectionString("IdentityDb") ?? "Data Source=identity.db";
-
     const string prefix = "Data Source=";
+
     if (raw.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
     {
         var file = raw[prefix.Length..].Trim();
@@ -39,7 +39,7 @@ var identityCs = BuildIdentityConnection(builder);
 builder.Services.AddDbContext<ApplicationDbContext>(opts =>
     opts.UseSqlite(identityCs));
 
-// Persist data protection keys
+// Persist data protection keys (prevents cookie/sign-in issues across restarts)
 var keysPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
     "BobaShop", "keys");
@@ -71,12 +71,16 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.LoginPath = "/Account/Login";
     o.LogoutPath = "/Account/Logout";
     o.AccessDeniedPath = "/Account/AccessDenied";
+    o.SlidingExpiration = true;
+    o.Cookie.HttpOnly = true;
+    o.Cookie.IsEssential = true;
 });
 
 // -----------------------------------------------------------------------------
 // 3) MVC + Razor Views
 // -----------------------------------------------------------------------------
 builder.Services.AddControllersWithViews();
+builder.Services.AddRouting(o => o.LowercaseUrls = true);
 
 // -----------------------------------------------------------------------------
 // 4) SESSION + CART SERVICE
@@ -101,13 +105,13 @@ builder.Services.AddScoped<IRewardsService, RewardsService>();
 // -----------------------------------------------------------------------------
 builder.Services.AddMemoryCache();
 
-// Baseline client factory for ApiAuthService
+// Generic client factory used by ApiAuthService
 builder.Services.AddHttpClient();
 
-// ApiAuthService should be scoped so each request gets a fresh auth header while still using the cache
+// Auth service that fetches/refreshes JWT and adds it to outgoing requests
 builder.Services.AddScoped<IApiAuthService, ApiAuthService>();
 
-// Optional typed client example for other API calls that do not need auth service
+// Typed client for Drinks API calls
 builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
 {
     var apiBase = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
@@ -133,9 +137,13 @@ builder.Services.AddAuthorization(options =>
 
 var app = builder.Build();
 
-// Log important paths and urls
+// Log important paths and URLs
 app.Logger.LogInformation("Identity DB: {cs}", identityCs);
-app.Logger.LogInformation("API BaseUrl: {api}", app.Configuration["Api:BaseUrl"]);
+
+// Resolve final API base from config/env to avoid confusion
+var resolvedApiBase = app.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
+if (!resolvedApiBase.EndsWith("/")) resolvedApiBase += "/";
+app.Logger.LogInformation("API BaseUrl: {api}", resolvedApiBase);
 
 // -----------------------------------------------------------------------------
 // 8) APPLY MIGRATIONS + SEED ROLES AND ADMIN
@@ -182,6 +190,9 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// Simple health check for Docker/compose
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
+
 app.Run();
 
 // -----------------------------------------------------------------------------
@@ -221,6 +232,12 @@ public class IdentitySeeder
 
             var result = await _users.CreateAsync(admin, adminPassword);
             if (result.Succeeded)
+                await _users.AddToRoleAsync(admin, adminRole);
+        }
+        else
+        {
+            // Ensure role in case user existed from an older run
+            if (!await _users.IsInRoleAsync(admin, adminRole))
                 await _users.AddToRoleAsync(admin, adminRole);
         }
     }
