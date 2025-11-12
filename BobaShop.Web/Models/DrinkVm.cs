@@ -1,24 +1,30 @@
-﻿namespace BobaShop.Web.Models;
-
-public class DrinkVm
+﻿namespace BobaShop.Web.Models
 {
-    public string Id { get; set; } = "";
-    public string Name { get; set; } = "";
-    public string? Description { get; set; }
+    public class DrinkVm
+    {
+        public string? Id { get; set; }
+        public string Name { get; set; } = string.Empty;
 
-    public decimal BasePrice { get; set; }
+        public string? Description { get; set; }
 
-    // NEW: size upcharges (match API model)
-    public decimal SmallUpcharge { get; set; }
-    public decimal MediumUpcharge { get; set; }
-    public decimal LargeUpcharge { get; set; }
+        public decimal BasePrice { get; set; } = 0m;
+        public decimal Price { get; set; } = 0m;
 
-    // NEW: defaults (match API model)
-    public int DefaultSugar { get; set; }
-    public int DefaultIce { get; set; }
+        public decimal SmallUpcharge { get; set; } = 0m;
+        public decimal MediumUpcharge { get; set; } = 0m;
+        public decimal LargeUpcharge { get; set; } = 0m;
 
-    public bool IsActive { get; set; }
+        public int DefaultSugar { get; set; } = 50;
+        public int DefaultIce { get; set; } = 50;
 
-    public DateTime? CreatedUtc { get; set; }
-    public DateTime? UpdatedUtc { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public string? ImageUrl { get; set; }
+        public string? ImageAlt { get; set; }
+
+        // NEW — for Admin views
+        public DateTime? CreatedUtc { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedUtc { get; set; }
+        public DateTime? DeletedUtc { get; set; }
+    }
 }

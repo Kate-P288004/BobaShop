@@ -6,46 +6,39 @@
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // -----------------------------------------------------------------------------
 // Description:
-//   Controller responsible for displaying the drinks catalogue and product 
-//   details pages in the BoBaTastic web app.
-//
-//   - Calls BobaShop.Api through the IDrinksApi service (HttpClient).
-//   - Fetches real MongoDB data (no in-memory demo list).
-//   - Demonstrates MVC routing, dependency injection, async/await,
-//     and strongly-typed Razor views.
+//   Public controller for drinks catalogue and product details pages.
+//   - Calls BobaShop.Api via IDrinksApi (HttpClient).
+//   - Strongly-typed Razor views (Menu: IEnumerable<ProductViewModel>, Details: ProductViewModel).
 // -----------------------------------------------------------------------------
 
-using Microsoft.AspNetCore.Mvc;
-using BobaShop.Web.Models;
-using BobaShop.Web.Services;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
+using BobaShop.Web.Models;
+using BobaShop.Web.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace BobaShop.Web.Controllers
 {
     /// <summary>
-    /// Public controller that presents the drinks menu and details pages.
-    /// Fully accessible without authentication.
+    /// Presents the drinks menu and details pages (no auth required).
     /// </summary>
     public class ProductsController : Controller
     {
         private readonly IDrinksApi _api;
 
-        /// <summary>
-        /// Inject the API client used to retrieve drinks.
-        /// </summary>
         public ProductsController(IDrinksApi api) => _api = api;
 
         // =====================================================================
-        // GET: /Products
-        // Friendly entry that redirects to /Products/Menu.
+        // GET: /Products  → redirect to /Products/Menu
         // =====================================================================
         public IActionResult Index() => RedirectToAction(nameof(Menu));
 
         // =====================================================================
         // GET: /Products/Menu
-        // Fetch all drinks from the API and render cards on the Menu page.
-        // View: Views/Products/Menu.cshtml (IEnumerable<ProductViewModel>)
+        // View: Views/Products/Menu.cshtml  (IEnumerable<ProductViewModel>)
         // =====================================================================
         public async Task<IActionResult> Menu()
         {
@@ -53,32 +46,26 @@ namespace BobaShop.Web.Controllers
             {
                 var drinks = await _api.GetAllAsync();
 
-                // Explicit lambda avoids Select(...) overload ambiguity.
-                var list = drinks.Select(d => MapToCard(d)).ToList();
+                // Map API models to simple card view models
+                var list = drinks.Select(MapToCard).ToList();
 
                 return View(list);
             }
             catch (HttpRequestException ex)
             {
-                // Friendly message if the API is unreachable.
                 ViewBag.Error = "Could not connect to the API: " + ex.Message;
-
-                // Optional: show a custom page if you’ve created Views/Products/ApiError.cshtml
-                // return View("ApiError");
-
                 return View(new List<ProductViewModel>());
             }
         }
 
         // =====================================================================
         // GET: /Products/Details/{id}
-        // Load one drink by its MongoDB ObjectId and build a details view model.
-        // View: Views/Products/Details.cshtml (ProductDetailsViewModel)
+        // View: Views/Products/Details.cshtml  (ProductViewModel)
         // =====================================================================
         [HttpGet]
         public async Task<IActionResult> Details(string id)
         {
-            // Guard: old demo links like /Products/Details/1
+            // Guard against bad ObjectId (24 hex chars)
             if (string.IsNullOrWhiteSpace(id) || id.Length != 24)
             {
                 TempData["Alert"] = "That item is unavailable. Please choose a drink from the Menu.";
@@ -91,20 +78,30 @@ namespace BobaShop.Web.Controllers
                 if (drink is null)
                     return NotFound();
 
-                var model = new ProductDetailsViewModel
+                var model = new ProductViewModel
                 {
-                    Id = drink.Id!,
+                    Id = drink.Id,
                     Name = drink.Name ?? "Unnamed drink",
-                    ImageUrl = GuessImage(drink.Name),
+                    Description = drink.Description,
                     BasePrice = drink.BasePrice,
+                    Price = drink.Price,           // if API uses BasePrice as selling price, that’s fine too
+                    SmallUpcharge = drink.SmallUpcharge,
+                    MediumUpcharge = drink.MediumUpcharge,
+                    LargeUpcharge = drink.LargeUpcharge,
+                    DefaultSugar = drink.DefaultSugar,
+                    DefaultIce = drink.DefaultIce,
+                    IsActive = drink.IsActive,
+                    // Prefer API image if present, else fall back to a guessed local image
+                    ImageUrl = string.IsNullOrWhiteSpace(drink.ImageUrl) ? GuessImage(drink.Name) : drink.ImageUrl,
+                    ImageAlt = drink.ImageAlt ?? drink.Name,
+                    // Static toppings list used by the Details page radio/checkbox UI
+                    Toppings = new List<ToppingVm>
+{
+    new ToppingVm { Name = "Pearls",        Price = 0.80m, IsActive = true },
+    new ToppingVm { Name = "Egg Pudding",   Price = 0.90m, IsActive = true },
+    new ToppingVm { Name = "Coconut Jelly", Price = 1.00m, IsActive = true }
+}
 
-                    // Static toppings for the customisation selector.
-                    Toppings = new()
-                    {
-                        new ToppingOption { Code = "pearls",  Name = "Pearls",        Price = 0.80m },
-                        new ToppingOption { Code = "pudding", Name = "Egg Pudding",   Price = 0.90m },
-                        new ToppingOption { Code = "coconut", Name = "Coconut Jelly", Price = 1.00m }
-                    }
                 };
 
                 return View(model);
@@ -112,28 +109,24 @@ namespace BobaShop.Web.Controllers
             catch (HttpRequestException ex)
             {
                 ViewBag.Error = "API request failed: " + ex.Message;
-
-                // Optional custom page; otherwise Shared/Error.cshtml will be used if you return View("Error")
-                // return View("ApiError");
-
                 return View("Error");
             }
         }
 
         // =====================================================================
-        // Helper: Map API drink (DrinkVm) to the card model used by Menu.cshtml
+        // Mapping helpers
         // =====================================================================
         private static ProductViewModel MapToCard(DrinkVm d) => new()
         {
             Id = d.Id ?? string.Empty,
             Name = d.Name ?? "Unnamed drink",
-            Price = d.BasePrice,
-            ImageUrl = GuessImage(d.Name)
+            // Use API-provided image if set; else guess a local image path
+            ImageUrl = string.IsNullOrWhiteSpace(d.ImageUrl) ? GuessImage(d.Name) : d.ImageUrl,
+            ImageAlt = d.ImageAlt ?? d.Name,
+            // Show a single price on the card (use BasePrice or Price per your API)
+            Price = d.Price != 0 ? d.Price : d.BasePrice
         };
 
-        // =====================================================================
-        // Helper: Guess an image path based on drink name to match /wwwroot/images
-        // =====================================================================
         private static string GuessImage(string? name)
         {
             if (string.IsNullOrWhiteSpace(name))

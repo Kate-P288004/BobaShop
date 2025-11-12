@@ -15,7 +15,7 @@ public class ProductsController : Controller
 
     public ProductsController(IApiAuthService apiAuth) => _apiAuth = apiAuth;
 
-    // GET: /Admin/Products
+    // -------------------- LIST --------------------
     [HttpGet]
     public async Task<IActionResult> Index()
     {
@@ -34,12 +34,22 @@ public class ProductsController : Controller
         return View(items.OrderBy(x => x.Name).ToList());
     }
 
+    // -------------------- CREATE --------------------
     [HttpGet]
-    public IActionResult Create() => View(new EditDrinkVm());
+    public IActionResult Create()
+    {
+        var vm = new ProductCreateVm
+        {
+            DefaultSugar = 50,
+            DefaultIce = 50,
+            IsActive = true
+        };
+        return View(vm); // Areas/Admin/Views/Products/Create.cshtml
+    }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(EditDrinkVm vm)
+    public async Task<IActionResult> Create(ProductCreateVm vm)
     {
         if (!ModelState.IsValid) return View(vm);
 
@@ -55,18 +65,16 @@ public class ProductsController : Controller
             largeUpcharge = vm.LargeUpcharge,
             defaultSugar = vm.DefaultSugar,
             defaultIce = vm.DefaultIce,
-            isActive = vm.IsActive
+            isActive = vm.IsActive,
+            imageUrl = vm.ImageUrl,
+            imageAlt = vm.ImageAlt
         };
 
         var resp = await api.PostAsJsonAsync("api/v1/Drinks", payload);
-
         if (!resp.IsSuccessStatusCode)
         {
-            var msg = resp.StatusCode == HttpStatusCode.Unauthorized
-                ? "API 401 Unauthorized while creating product."
-                : $"API error {(int)resp.StatusCode}";
-            ModelState.AddModelError(string.Empty, msg);
-            TempData["Error"] = msg;
+            await AddApiErrorsToModelState(resp);
+            TempData["Error"] = $"API error {(int)resp.StatusCode}";
             return View(vm);
         }
 
@@ -74,6 +82,7 @@ public class ProductsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // -------------------- EDIT --------------------
     [HttpGet]
     public async Task<IActionResult> Edit(string id)
     {
@@ -105,6 +114,7 @@ public class ProductsController : Controller
             DefaultSugar = drink.DefaultSugar,
             DefaultIce = drink.DefaultIce,
             IsActive = drink.IsActive
+            // If you later add image editing, extend EditDrinkVm and map here.
         };
 
         ViewBag.DrinkId = drink.Id;
@@ -135,17 +145,14 @@ public class ProductsController : Controller
             defaultSugar = vm.DefaultSugar,
             defaultIce = vm.DefaultIce,
             isActive = vm.IsActive
+            // Include image fields here if Edit supports them later.
         };
 
         var resp = await api.PutAsJsonAsync($"api/v1/Drinks/{id}", payload);
-
         if (!resp.IsSuccessStatusCode)
         {
-            var msg = resp.StatusCode == HttpStatusCode.Unauthorized
-                ? "API 401 Unauthorized while updating product."
-                : $"API error {(int)resp.StatusCode}";
-            ModelState.AddModelError(string.Empty, msg);
-            TempData["Error"] = msg;
+            await AddApiErrorsToModelState(resp);
+            TempData["Error"] = $"API error {(int)resp.StatusCode}";
             ViewBag.DrinkId = id;
             return View(vm);
         }
@@ -154,6 +161,7 @@ public class ProductsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // -------------------- DELETE --------------------
     [HttpGet]
     public async Task<IActionResult> Delete(string id)
     {
@@ -196,5 +204,41 @@ public class ProductsController : Controller
 
         TempData["Ok"] = "Product deleted.";
         return RedirectToAction(nameof(Index));
+    }
+
+    // -------------------- Helpers --------------------
+    private async Task AddApiErrorsToModelState(HttpResponseMessage resp)
+    {
+        // Try ValidationProblemDetails shape first
+        try
+        {
+            var vpd = await resp.Content.ReadFromJsonAsync<ValidationProblemDetails>();
+            if (vpd?.Errors?.Count > 0)
+            {
+                foreach (var kv in vpd.Errors)
+                {
+                    var key = string.IsNullOrWhiteSpace(kv.Key) ? string.Empty : kv.Key;
+                    foreach (var msg in kv.Value)
+                        ModelState.AddModelError(key, msg);
+                }
+                return;
+            }
+        }
+        catch { /* ignore parse errors */ }
+
+        // Fallback: plain ProblemDetails or raw text
+        try
+        {
+            var pd = await resp.Content.ReadFromJsonAsync<ProblemDetails>();
+            if (!string.IsNullOrWhiteSpace(pd?.Detail))
+            {
+                ModelState.AddModelError(string.Empty, pd.Detail);
+                return;
+            }
+        }
+        catch { /* ignore parse errors */ }
+
+        var body = await resp.Content.ReadAsStringAsync();
+        ModelState.AddModelError(string.Empty, $"API error {(int)resp.StatusCode}: {body}");
     }
 }

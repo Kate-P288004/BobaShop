@@ -16,6 +16,7 @@ using BobaShop.Api.Data;
 using BobaShop.Api.Identity;
 using BobaShop.Api.Models;
 using BobaShop.Api.Seed;
+using BobaShop.Api.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
@@ -56,6 +57,9 @@ static string BuildIdentityConnection(WebApplicationBuilder b)
 // -----------------------------------------------------------------------------
 builder.Services.Configure<MongoSettings>(config.GetSection("Mongo"));
 builder.Services.AddSingleton<MongoDbContext>();
+
+builder.Services.Configure<MediaSettings>(config.GetSection("Media"));
+
 
 // -----------------------------------------------------------------------------
 // 2) ASP.NET Identity on SQLite (with roles)
@@ -315,6 +319,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();      // serves /images/... from wwwroot over https
 app.UseCors(CorsPolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
