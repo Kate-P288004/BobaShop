@@ -1,14 +1,15 @@
 ﻿// -----------------------------------------------------------------------------
-// File: Customer.cs
+// File: Models/Customer.cs
 // Project: BobaShop.Api
 // Student: Kate Odabas (P288004)
 // Date: November 2025
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // Description:
-//   Represents a registered customer stored in the MongoDB database.
-//   Includes lifecycle tracking fields (CreatedAt, UpdatedAt, DeletedAt)
-//   to demonstrate use of the “Magic Three Dates” pattern for record
-//   creation, modification, and soft deletion.
+//   Represents a registered customer document stored in the MongoDB database.
+//   Includes user profile information, authentication hash, loyalty points,
+//   and lifecycle tracking fields using the “Magic Three Dates” pattern
+//   (CreatedAt, UpdatedAt, DeletedAt) to support creation, updates,
+//   and soft deletion for audit-friendly persistence.
 // -----------------------------------------------------------------------------
 
 using MongoDB.Bson;
@@ -20,47 +21,76 @@ namespace BobaShop.Api.Models
     // -------------------------------------------------------------------------
     // Model: Customer
     // Purpose:
-    //   Stores user profile and loyalty data for authenticated customers.
-    //   Used across registration, login, and reward tracking features.
-    //   Demonstrates use of MongoDB BSON mapping attributes.
-    // Mapping: ICTPRG554 PE1.1 / ICTPRG554 PE1.2 / ICTPRG556 PE2.1
+    //   Stores essential account and loyalty information for customers
+    //   interacting with the BobaShop application. 
+    //   Demonstrates MongoDB document mapping using BSON attributes.
+    // Notes:
+    //   - The “Magic Three Dates” pattern tracks document state transitions.
+    //   - This model supports both authentication and reward tracking use cases.
+    // Mapping: ICTPRG554 PE1.1 / PE1.2 / ICTPRG556 PE2.1
     // -------------------------------------------------------------------------
     public class Customer
     {
-        // Unique identifier (MongoDB ObjectId)
+        // ---------------------------------------------------------------------
+        // Unique MongoDB ObjectId used as the primary key.
+        // - Automatically generated when inserted into MongoDB.
+        // - Stored as a string for JSON serialization compatibility.
+        // ---------------------------------------------------------------------
         [BsonId]
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = string.Empty;
 
-        // Full name of the customer (displayed on account page)
+        // ---------------------------------------------------------------------
+        // Customer's full display name.
+        // - Shown on profile pages and order receipts.
+        // - Typically entered during registration or updated via profile edit.
+        // ---------------------------------------------------------------------
         [BsonElement("name")]
         public string Name { get; set; } = string.Empty;
 
-        // Email address used for login and order tracking
+        // ---------------------------------------------------------------------
+        // Customer’s registered email address.
+        // - Serves as the unique login identifier for authentication.
+        // - Also used for sending order confirmations and receipts.
+        // ---------------------------------------------------------------------
         [BsonElement("email")]
         public string Email { get; set; } = string.Empty;
 
-        // Hashed password for authentication (not stored in plain text)
+        // ---------------------------------------------------------------------
+        // Password hash stored securely for authentication.
+        // - Plain-text passwords are never persisted.
+        // - Hash generated via ASP.NET Identity’s password hasher.
+        // ---------------------------------------------------------------------
         [BsonElement("passwordHash")]
         public string PasswordHash { get; set; } = string.Empty;
 
-        // Loyalty points earned (1 point = $1 spent)
+        // ---------------------------------------------------------------------
+        // Loyalty points accumulated through purchases.
+        // - Typically: 1 point = $1 spent.
+        // - Used for reward redemption and promotions.
+        // ---------------------------------------------------------------------
         [BsonElement("points")]
         public int Points { get; set; }
 
-        // -------------------------------------------------------------
-        // Record lifecycle tracking fields (Magic Three Dates pattern)
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------------
+        // Record lifecycle tracking — “Magic Three Dates” pattern
+        // Purpose:
+        //   Tracks when the document was created, last updated, or soft-deleted.
+        //   This pattern is used across multiple collections for consistency.
+        // ---------------------------------------------------------------------
 
-        // Date the customer record was created (UTC)
+        // Date and time when the record was created (UTC).
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        // Date the customer record was last updated (UTC)
+        // Date and time of the most recent modification (UTC).
+        // - Null means the record has not been updated since creation.
         [BsonElement("updatedAt")]
         public DateTime? UpdatedAt { get; set; }
 
-        // Date the customer record was soft-deleted (null = active)
+        // Soft deletion marker (UTC).
+        // - Null = active record.
+        // - Non-null = record hidden but preserved for audit/recovery.
         [BsonElement("deletedAt")]
         public DateTime? DeletedAt { get; set; }
     }

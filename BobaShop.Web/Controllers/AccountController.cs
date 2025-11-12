@@ -5,11 +5,26 @@
 // Date: November 2025
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // Description:
-//   Manages all account-related functionality for the BoBaTastic web interface.
-//   Provides endpoints for user registration, login, logout, and access denied.
-//   Uses ASP.NET Core Identity with a custom ApplicationUser model to store
-//   customer details (including RewardPoints). Integrates with Identity roles
-//   to distinguish Admin and Customer access within the system.
+//   MVC controller that handles user registration, login, logout, and the
+//   "access denied" page for the BoBaTastic site.
+//
+//   Storage/Auth stack:
+//     - ASP.NET Core Identity (ApplicationUser) backed by SQLite per Program.cs
+//     - Cookie authentication for the Web app (separate from API JWTs)
+//     - Identity roles used by [Authorize(Policy = "RequireAdmin")] in Admin area
+//
+//   Key flows this controller covers:
+//     - Register: create ApplicationUser, add "Customer" role, sign in
+//     - Login: validate credentials, respect RememberMe, safe ReturnUrl redirect
+//     - Logout: sign out and clear auth cookie
+//     - AccessDenied: show a friendly page when role/auth fails
+//
+// Notes and pitfalls:
+//   - Email is used as both username and identifier to simplify login UX.
+//   - EmailConfirmed is set true for demo simplicity. For production, send a
+//     confirmation email and require confirmation before allowing login.
+//   - lockoutOnFailure is enabled on login to support Identity lockout policy.
+//   - ReturnUrl is only honored if it’s a local URL (anti-open-redirect).
 // -----------------------------------------------------------------------------
 
 using System.ComponentModel.DataAnnotations;
@@ -23,26 +38,28 @@ namespace BobaShop.Web.Controllers
     // -------------------------------------------------------------------------
     // Controller: AccountController
     // Purpose:
-    //   Handles registration, authentication, and session management.
-    //   Uses ASP.NET Identity dependency injection to securely manage users.
-    //   This controller supports:
-    //     • Registration (POST /Account/Register)
-    //     • Login (POST /Account/Login)
-    //     • Logout (POST /Account/Logout)
-    //     • AccessDenied (GET /Account/AccessDenied)
-    // Mapping: ICTPRG556 – MVC routing, model binding & auth logic
+    //   Entry point for account lifecycle in the Web app:
+    //     • GET/POST Register
+    //     • GET/POST Login
+    //     • POST Logout
+    //     • GET AccessDenied
+    //
+    // Dependencies:
+    //   - UserManager<ApplicationUser>: user CRUD, roles, password hashing
+    //   - SignInManager<ApplicationUser>: sign-in cookie, lockouts, 2FA hooks
+    //
+    // Rubric mapping hints:
+    //   - ICTPRG556: routing, model binding, validation attributes, auth logic
     // -------------------------------------------------------------------------
     public class AccountController : Controller
     {
-        // ASP.NET Core Identity managers for user and sign-in operations
+        // Identity managers: injected via DI in Program.cs
         private readonly UserManager<ApplicationUser> _users;
         private readonly SignInManager<ApplicationUser> _signIn;
 
         // ---------------------------------------------------------------------
-        // Constructor:
-        //   Injects UserManager and SignInManager services from Identity.
-        //   These services provide APIs to create users, check passwords,
-        //   manage roles, and maintain authentication cookies.
+        // Constructor
+        // Wires up the Identity services that handle secure user and session ops.
         // ---------------------------------------------------------------------
         public AccountController(
             UserManager<ApplicationUser> users,
@@ -53,14 +70,13 @@ namespace BobaShop.Web.Controllers
         }
 
         // =====================================================================
-        // REGISTER ACTIONS
+        // REGISTER
         // =====================================================================
 
         // ---------------------------------------------------------------------
         // GET: /Account/Register
-        // Purpose:
-        //   Displays the registration form for new users.
-        //   Accessible without authentication.
+        // Shows a blank registration form.
+        // Anonymous access by design.
         // ---------------------------------------------------------------------
         [HttpGet]
         [AllowAnonymous]
@@ -68,10 +84,16 @@ namespace BobaShop.Web.Controllers
 
         // ---------------------------------------------------------------------
         // POST: /Account/Register
-        // Purpose:
-        //   Handles form submission to create a new ApplicationUser.
-        //   Automatically assigns the “Customer” role and logs them in.
-        //   Uses data annotations to validate user input.
+        // Validates input, creates an ApplicationUser, assigns the "Customer"
+        // role, and signs the user in. On success, return to Home.
+        //
+        // Validation path:
+        //   - Data annotations on RegisterVm
+        //   - Identity password policy enforced by UserManager.CreateAsync
+        //
+        // Error path:
+        //   - If Identity fails (weak password, duplicate email), push errors
+        //     into ModelState so the view can display them under the form.
         // ---------------------------------------------------------------------
         [HttpPost]
         [AllowAnonymous]
@@ -80,27 +102,32 @@ namespace BobaShop.Web.Controllers
         {
             if (!ModelState.IsValid) return View(vm);
 
-            // Create the custom ApplicationUser instance
+            // Build domain user object.
+            // RewardPoints kept in ApplicationUser to support loyalty features.
             var user = new ApplicationUser
             {
                 UserName = vm.Email,
                 Email = vm.Email,
-                EmailConfirmed = true,   // Simplified for demo
-                RewardPoints = 0         // Start new users with zero points
+                EmailConfirmed = true,   // Demo shortcut; in production send email
+                RewardPoints = 0
             };
 
-            // Attempt to create the user account in the Identity store
+            // Persist user with hashed password.
             var result = await _users.CreateAsync(user, vm.Password);
 
             if (result.Succeeded)
             {
-                // Assign role and automatically sign in
+                // Default role aligns with API/AuthController assumptions.
                 await _users.AddToRoleAsync(user, "Customer");
+
+                // Establish the auth cookie for the Web app.
                 await _signIn.SignInAsync(user, isPersistent: false);
+
+                // Post-registration landing page. Could redirect to /Account/Profile later.
                 return RedirectToAction("Index", "Home");
             }
 
-            // If registration fails, display validation messages
+            // Show Identity errors (e.g., password strength, duplicate email).
             foreach (var e in result.Errors)
                 ModelState.AddModelError(string.Empty, e.Description);
 
@@ -108,14 +135,13 @@ namespace BobaShop.Web.Controllers
         }
 
         // =====================================================================
-        // LOGIN ACTIONS
+        // LOGIN
         // =====================================================================
 
         // ---------------------------------------------------------------------
         // GET: /Account/Login
-        // Purpose:
-        //   Displays the login page. Includes an optional ReturnUrl to redirect
-        //   back to a protected page after successful login.
+        // Accepts an optional ReturnUrl; used after hitting an [Authorize] page.
+        // The view should render the hidden ReturnUrl field so it round-trips.
         // ---------------------------------------------------------------------
         [HttpGet]
         [AllowAnonymous]
@@ -124,9 +150,13 @@ namespace BobaShop.Web.Controllers
 
         // ---------------------------------------------------------------------
         // POST: /Account/Login
-        // Purpose:
-        //   Validates user credentials using ASP.NET Identity’s sign-in manager.
-        //   Supports “Remember Me” persistent login and local ReturnUrl redirects.
+        // Checks credentials and issues the auth cookie.
+        //
+        // Security notes:
+        //   - lockoutOnFailure: true -> uses Identity lockout config for brute
+        //     force protection. Configure lockout thresholds in Program.cs.
+        //   - Returns a single generic error to avoid username enumeration.
+        //   - Only redirects to ReturnUrl if it’s local (Url.IsLocalUrl).
         // ---------------------------------------------------------------------
         [HttpPost]
         [AllowAnonymous]
@@ -135,20 +165,18 @@ namespace BobaShop.Web.Controllers
         {
             if (!ModelState.IsValid) return View(vm);
 
-            // Attempt to sign in using email as the username
             var result = await _signIn.PasswordSignInAsync(
                 vm.Email, vm.Password, vm.RememberMe, lockoutOnFailure: true);
 
             if (result.Succeeded)
             {
-                // Redirect to ReturnUrl if provided and valid, otherwise go home
                 if (!string.IsNullOrWhiteSpace(vm.ReturnUrl) && Url.IsLocalUrl(vm.ReturnUrl))
                     return Redirect(vm.ReturnUrl);
 
                 return RedirectToAction("Index", "Home");
             }
 
-            // Add generic error message for invalid credentials
+            // Avoid detailed errors to prevent leaking validity of accounts.
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             return View(vm);
         }
@@ -159,9 +187,8 @@ namespace BobaShop.Web.Controllers
 
         // ---------------------------------------------------------------------
         // POST: /Account/Logout
-        // Purpose:
-        //   Signs the current user out and clears the authentication cookie.
-        //   Redirects to the Home page.
+        // Invalidates the auth cookie and returns to the home page.
+        // Anti-forgery token protects against CSRF on logout requests.
         // ---------------------------------------------------------------------
         [Authorize]
         [HttpPost]
@@ -174,21 +201,27 @@ namespace BobaShop.Web.Controllers
 
         // ---------------------------------------------------------------------
         // GET: /Account/AccessDenied
-        // Purpose:
-        //   Shown when a user tries to access a restricted page without the
-        //   proper role or authorization level.
+        // Shown when authorization fails (e.g., missing Admin role).
+        // The view should explain how to reach support or request access.
         // ---------------------------------------------------------------------
         public IActionResult AccessDenied() => View();
 
         // =====================================================================
-        // VIEW MODELS (Inner Classes)
-        // Purpose:
-        //   Lightweight data containers used to bind form input values.
-        //   Each ViewModel includes data annotations for server-side validation.
+        // VIEW MODELS
         // =====================================================================
 
         // ---------------------------------------------------------------------
-        // RegisterVm: Used on the registration page
+        // RegisterVm
+        // Bound to the registration form.
+        // Fields:
+        //   - Email: required, must be a valid email format
+        //   - Password: required, password input
+        //   - ConfirmPassword: must match Password
+        //
+        // Extend later:
+        //   - DisplayName or FullName
+        //   - Marketing opt-in
+        //   - Terms acceptance checkbox
         // ---------------------------------------------------------------------
         public class RegisterVm
         {
@@ -200,12 +233,15 @@ namespace BobaShop.Web.Controllers
 
             [Required, DataType(DataType.Password), Compare(nameof(Password))]
             public string ConfirmPassword { get; set; } = "";
-
-            
         }
 
         // ---------------------------------------------------------------------
-        // LoginVm: Used on the login page
+        // LoginVm
+        // Bound to the login form.
+        // Fields:
+        //   - Email/Password: standard credentials
+        //   - RememberMe: persistent cookie if true
+        //   - ReturnUrl: preserved across GET/POST to redirect back safely
         // ---------------------------------------------------------------------
         public class LoginVm
         {

@@ -1,9 +1,23 @@
-// ---------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // File: Program.cs
-// Project: BobaShop.Web (BoBaTastic)
+// Project: BobaShop.Web (BoBaTastic Frontend)
 // Student: Kate Odabas (P288004)
 // Date: November 2025
-// ---------------------------------------------------------------
+// Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
+// -----------------------------------------------------------------------------
+// Description:
+//   Entry point for the BoBatastic Web frontend (MVC application).
+//   Configures ASP.NET Core Identity (SQLite), session management, service
+//   dependency injection, API integration (via HttpClient), authorization,
+//   and startup seeding for admin roles and users.
+//
+//   Key Concepts Demonstrated:
+//     • Identity authentication & role management
+//     • Dependency injection (services, data, HTTP clients)
+//     • Session-based cart functionality
+//     • API integration and JWT authentication
+//     • Database migration & admin seeding on startup
+// -----------------------------------------------------------------------------
 
 using BobaShop.Web.Data;
 using BobaShop.Web.Services;
@@ -15,7 +29,8 @@ using System.Net.Http.Headers;
 var builder = WebApplication.CreateBuilder(args);
 
 // -----------------------------------------------------------------------------
-// 1) DATABASE (SQLite for Identity) — absolute path to identity.db
+// 1) DATABASE CONFIGURATION (SQLite for Identity)
+//    Ensures an absolute path to the local identity.db file.
 // -----------------------------------------------------------------------------
 static string BuildIdentityConnection(WebApplicationBuilder b)
 {
@@ -36,10 +51,11 @@ static string BuildIdentityConnection(WebApplicationBuilder b)
 
 var identityCs = BuildIdentityConnection(builder);
 
+// Register SQLite DbContext for Identity
 builder.Services.AddDbContext<ApplicationDbContext>(opts =>
     opts.UseSqlite(identityCs));
 
-// Persist data protection keys (prevents cookie/sign-in issues across restarts)
+// Persist Data Protection keys to avoid cookie issues between restarts
 var keysPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
     "BobaShop", "keys");
@@ -51,7 +67,8 @@ builder.Services
     .PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 
 // -----------------------------------------------------------------------------
-// 2) IDENTITY (ApplicationUser + Roles)
+// 2) ASP.NET IDENTITY (Users + Roles)
+//    Configures password rules, login cookies, and token providers.
 // -----------------------------------------------------------------------------
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(opts =>
@@ -77,13 +94,14 @@ builder.Services.ConfigureApplicationCookie(o =>
 });
 
 // -----------------------------------------------------------------------------
-// 3) MVC + Razor Views
+// 3) MVC + RAZOR VIEW SUPPORT
 // -----------------------------------------------------------------------------
 builder.Services.AddControllersWithViews();
 builder.Services.AddRouting(o => o.LowercaseUrls = true);
 
 // -----------------------------------------------------------------------------
 // 4) SESSION + CART SERVICE
+//    Enables session persistence for shopping cart functionality.
 // -----------------------------------------------------------------------------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSession(options =>
@@ -97,21 +115,21 @@ builder.Services.AddScoped<ICartService, CartService>();
 
 // -----------------------------------------------------------------------------
 // 5) REWARDS SERVICE
+//    Manages customer loyalty points for authenticated users.
 // -----------------------------------------------------------------------------
 builder.Services.AddScoped<IRewardsService, RewardsService>();
 
 // -----------------------------------------------------------------------------
 // 6) API AUTH + HTTP CLIENTS
+//    Configures services for communicating with BobaShop.Api using JWT tokens.
 // -----------------------------------------------------------------------------
 builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient(); // Generic HttpClient factory
 
-// Generic client factory used by ApiAuthService
-builder.Services.AddHttpClient();
-
-// Auth service that fetches/refreshes JWT and adds it to outgoing requests
+// Handles JWT auth and caching
 builder.Services.AddScoped<IApiAuthService, ApiAuthService>();
 
-// Typed client for Drinks API calls
+// Typed client for Drinks API requests
 builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
 {
     var apiBase = builder.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
@@ -123,7 +141,7 @@ builder.Services.AddHttpClient<IDrinksApi, DrinksApiService>(client =>
 .SetHandlerLifetime(TimeSpan.FromMinutes(5));
 
 // -----------------------------------------------------------------------------
-// 7) IDENTITY SEEDER (Roles + Admin user)
+// 7) IDENTITY SEEDER (Roles + Default Admin Account)
 // -----------------------------------------------------------------------------
 builder.Services.AddScoped<IdentitySeeder>();
 
@@ -135,18 +153,19 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("RequireAdmin", policy => policy.RequireRole("Admin"));
 });
 
+// -----------------------------------------------------------------------------
+// 8) APPLICATION BUILD + LOGGING
+// -----------------------------------------------------------------------------
 var app = builder.Build();
 
-// Log important paths and URLs
 app.Logger.LogInformation("Identity DB: {cs}", identityCs);
 
-// Resolve final API base from config/env to avoid confusion
 var resolvedApiBase = app.Configuration["Api:BaseUrl"] ?? "https://localhost:7274/";
 if (!resolvedApiBase.EndsWith("/")) resolvedApiBase += "/";
 app.Logger.LogInformation("API BaseUrl: {api}", resolvedApiBase);
 
 // -----------------------------------------------------------------------------
-// 8) APPLY MIGRATIONS + SEED ROLES AND ADMIN
+// 9) APPLY MIGRATIONS + SEED ADMIN ACCOUNT
 // -----------------------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {
@@ -162,7 +181,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 // -----------------------------------------------------------------------------
-// 9) MIDDLEWARE PIPELINE
+// 10) MIDDLEWARE PIPELINE CONFIGURATION
 // -----------------------------------------------------------------------------
 if (!app.Environment.IsDevelopment())
 {
@@ -172,31 +191,31 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-
 app.UseRouting();
-
 app.UseSession();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Areas route for Admin
+// Route for Admin area controllers
 app.MapControllerRoute(
     name: "areas",
     pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
 
-// Default route
+// Default route for public controllers
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// Simple health check for Docker/compose
+// Simple health check endpoint for Docker
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok", time = DateTimeOffset.UtcNow }));
 
 app.Run();
 
 // -----------------------------------------------------------------------------
-// Identity Seeder (creates roles and admin on startup)
+// CLASS: IdentitySeeder
+// Purpose:
+//   Automatically ensures that roles ("Admin", "Customer") exist
+//   and creates a default admin user on first launch.
 // -----------------------------------------------------------------------------
 public class IdentitySeeder
 {
@@ -209,6 +228,11 @@ public class IdentitySeeder
         _users = users;
     }
 
+    // -------------------------------------------------------------------------
+    // Method: SeedAsync
+    // Purpose:
+    //   Ensures required roles exist and seeds an administrator user if missing.
+    // -------------------------------------------------------------------------
     public async Task SeedAsync(string adminEmail, string adminPassword, string adminRole)
     {
         var roles = new[] { "Admin", "Customer" };
@@ -234,11 +258,10 @@ public class IdentitySeeder
             if (result.Succeeded)
                 await _users.AddToRoleAsync(admin, adminRole);
         }
-        else
+        else if (!await _users.IsInRoleAsync(admin, adminRole))
         {
-            // Ensure role in case user existed from an older run
-            if (!await _users.IsInRoleAsync(admin, adminRole))
-                await _users.AddToRoleAsync(admin, adminRole);
+            // Ensure admin role assigned if pre-existing
+            await _users.AddToRoleAsync(admin, adminRole);
         }
     }
 }

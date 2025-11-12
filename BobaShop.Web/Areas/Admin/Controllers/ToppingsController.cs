@@ -1,4 +1,22 @@
-﻿using System.Text;
+﻿// -----------------------------------------------------------------------------
+// File: Areas/Admin/Controllers/ToppingsController.cs
+// Project: BobaShop.Web (Admin area)
+// Security: Requires "RequireAdmin" policy; API calls carry JWT via IApiAuthService
+// Purpose:
+//   Admin MVC controller for managing Toppings through the API.
+//   Lists, creates, edits, and soft-deletes toppings by calling API v1 routes.
+// Key ideas:
+//   - Uses IApiAuthService to build HttpClient instances with the current user's token
+//   - Surfaces API failures to the UI via TempData and ModelState
+//   - Keeps view models small and focused; mapping happens at the edges
+// Views:
+//   Areas/Admin/Views/Toppings/Index.cshtml
+//   Areas/Admin/Views/Toppings/Create.cshtml
+//   Areas/Admin/Views/Toppings/Edit.cshtml
+//   Areas/Admin/Views/Toppings/Delete.cshtml
+// -----------------------------------------------------------------------------
+
+using System.Text;
 using System.Text.Json;
 using BobaShop.Web.Models;
 using BobaShop.Web.Services; // <-- add
@@ -13,12 +31,24 @@ public class ToppingsController : Controller
 {
     private readonly IApiAuthService _apiAuth;
 
+    // DI: resolve IApiAuthService to obtain an authenticated HttpClient per request
     public ToppingsController(IApiAuthService apiAuth)
     {
         _apiAuth = apiAuth;
     }
 
+    // -------------------------------------------------------------------------
     // GET: Admin/Toppings
+    // Renders a paged list of toppings for administrators.
+    // Flow:
+    //   1) Build an HttpClient that includes the user's bearer token.
+    //   2) Call API GET /api/v1/Toppings with a high take cap for admin browsing.
+    //   3) If the API returns an error, show a friendly banner and an empty list.
+    //   4) Otherwise, deserialize and sort by Name for predictable UI ordering.
+    // Notes:
+    //   - Uses System.Text.Json with case-insensitive mapping to be lenient.
+    //   - Consider server-side paging for very large datasets later.
+    // -------------------------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> Index()
     {
@@ -39,9 +69,19 @@ public class ToppingsController : Controller
 
     // --------------------- CREATE ---------------------
 
+    // GET: Admin/Toppings/Create
+    // Shows a blank form. Defaults come from EditToppingVm.
     [HttpGet]
     public IActionResult Create() => View(new EditToppingVm());
 
+    // POST: Admin/Toppings/Create
+    // Creates a topping through API POST /api/v1/Toppings.
+    // Behavior:
+    //   - Validates ModelState before calling the API.
+    //   - Serializes only fields the API expects to keep payloads clean.
+    // UX:
+    //   - On success, redirect to Index with a success toast.
+    //   - On error, keep the user on the form and show error details.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(EditToppingVm vm)
@@ -73,6 +113,11 @@ public class ToppingsController : Controller
 
     // ---------------------- EDIT ----------------------
 
+    // GET: Admin/Toppings/Edit/{id}
+    // Loads a topping and maps it into EditToppingVm for the form.
+    // Error handling:
+    //   - 404 from API maps to MVC NotFound to keep semantics aligned.
+    //   - Other failures show a banner and return to Index.
     [HttpGet]
     public async Task<IActionResult> Edit(string id)
     {
@@ -100,10 +145,19 @@ public class ToppingsController : Controller
             IsActive = t.IsActive
         };
 
+        // Used by the view to form correct action URLs
         ViewBag.ToppingId = t.Id;
         return View(vm);
     }
 
+    // POST: Admin/Toppings/Edit/{id}
+    // Updates a topping through API PUT /api/v1/Toppings/{id}.
+    // Behavior:
+    //   - Validates ModelState and preserves ViewBag.ToppingId when redisplaying.
+    //   - Sends only the fields that are editable in the form.
+    // UX:
+    //   - Success -> redirect to Index with a toast.
+    //   - Failure -> add error to ModelState and keep the user on the form.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(string id, EditToppingVm vm)
@@ -142,6 +196,9 @@ public class ToppingsController : Controller
 
     // --------------------- DELETE ---------------------
 
+    // GET: Admin/Toppings/Delete/{id}
+    // Shows a confirmation screen populated with topping details.
+    // Error handling matches Edit for consistency.
     [HttpGet]
     public async Task<IActionResult> Delete(string id)
     {
@@ -164,6 +221,11 @@ public class ToppingsController : Controller
         return View(t);
     }
 
+    // POST: Admin/Toppings/Delete/{id}
+    // Confirms deletion. Calls API DELETE /api/v1/Toppings/{id}.
+    // Behavior:
+    //   - On error, redirect back to the Delete page so the user can retry.
+    //   - On success, redirect to Index with a success toast.
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(string id)

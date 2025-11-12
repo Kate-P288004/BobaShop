@@ -66,7 +66,6 @@ namespace BobaShop.Api.Data
                     new CreateIndexOptions { Name = "idx_order_customer_created" }));
 
             // -------------------------------------------------------
-            // Optional (if you added Customers collection)
             //    - Index on Email for login lookups
             // -------------------------------------------------------
             try

@@ -5,9 +5,10 @@
 // Date: November 2025
 // Assessment: AT2 – MVC & NoSQL Project (ICTPRG554 / ICTPRG556)
 // Description:
-//   Entry point for the BoBatastic API.
-//   Configures MongoDB, ASP.NET Identity on SQLite, JWT auth, API Versioning,
-//   Swagger with Bearer support, CORS, ProblemDetails, and Mongo seeding.
+//   Application entry point and composition root.
+//   Registers services (MongoDB, Identity/SQLite, JWT auth, API Versioning,
+//   Swagger, CORS, ProblemDetails), builds the middleware pipeline, runs seeders.
+//   Notes: keep secrets out of source control; prefer environment variables for JWT.
 // -----------------------------------------------------------------------------
 
 using Asp.Versioning;
@@ -33,7 +34,12 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
 // -----------------------------------------------------------------------------
-// Helper: build an absolute SQLite connection string for Identity
+// Helper: BuildIdentityConnection
+// Purpose:
+//   Resolve a Data Source path to an absolute on-disk file for SQLite.
+//   Supports both relative and absolute paths in appsettings.json.
+// Why:
+//   EF Core migrations and logging are clearer when the DB file is absolute.
 // -----------------------------------------------------------------------------
 static string BuildIdentityConnection(WebApplicationBuilder b)
 {
@@ -54,15 +60,25 @@ static string BuildIdentityConnection(WebApplicationBuilder b)
 
 // -----------------------------------------------------------------------------
 // 1) MongoDB configuration and context
+// Registers:
+//   - IOptions<MongoSettings> from configuration section "Mongo"
+//   - MongoDbContext as a singleton (safe because MongoClient is thread-safe)
+// Also:
+//   - Binds optional MediaSettings for preset images and static assets.
 // -----------------------------------------------------------------------------
 builder.Services.Configure<MongoSettings>(config.GetSection("Mongo"));
 builder.Services.AddSingleton<MongoDbContext>();
 
 builder.Services.Configure<MediaSettings>(config.GetSection("Media"));
 
-
 // -----------------------------------------------------------------------------
 // 2) ASP.NET Identity on SQLite (with roles)
+// Registers:
+//   - AppIdentityDbContext (SQLite)
+//   - Identity with ApplicationUser + roles + token providers
+// Notes:
+//   - Password policy kept simple but includes uppercase, digit, non-alphanumeric
+//   - For production, consider stronger requirements and lockout settings
 // -----------------------------------------------------------------------------
 var identityCs = BuildIdentityConnection(builder);
 builder.Services.AddDbContext<AppIdentityDbContext>(opts => opts.UseSqlite(identityCs));
@@ -80,12 +96,17 @@ builder.Services
 
 // -----------------------------------------------------------------------------
 // 3) Controllers + JSON
+// Notes:
+//   - Customize JSON options here if you need specific casing or converters
 // -----------------------------------------------------------------------------
 builder.Services.AddControllers()
     .AddJsonOptions(_ => { });
 
 // -----------------------------------------------------------------------------
 // 4) API Versioning
+// Default:
+//   v1.0 when unspecified. Versions appear in route as /api/v{version}/...
+// Swashbuckle integration via AddApiExplorer for group naming.
 // -----------------------------------------------------------------------------
 builder.Services.AddApiVersioning(options =>
 {
@@ -101,6 +122,14 @@ builder.Services.AddApiVersioning(options =>
 
 // -----------------------------------------------------------------------------
 // 5) JWT Authentication
+// Reads:
+//   Jwt:Key, Jwt:Issuer, Jwt:Audience from configuration.
+// Behavior:
+//   - Falls back to a dev-only key when missing (logs a warning).
+//   - Maps RoleClaimType and NameClaimType so [Authorize(Roles="Admin")] works.
+// Security:
+//   - Replace the fallback key in production.
+//   - Prefer storing Jwt:Key in environment variables or a secret store.
 // -----------------------------------------------------------------------------
 var jwtSection = config.GetSection("Jwt");
 var jwtKey = jwtSection["Key"];
@@ -139,7 +168,7 @@ builder.Services
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(2),
 
-            // Map standard role/name claims so [Authorize(Roles="Admin")] works
+            // Role/Name mapping so [Authorize(Roles = "...")] matches "role" claims
             RoleClaimType = ClaimTypes.Role,
             NameClaimType = ClaimTypes.Name
         };
@@ -147,6 +176,10 @@ builder.Services
 
 // -----------------------------------------------------------------------------
 // 6) Authorization policies
+// Adds:
+//   "RequireAdmin" policy that requires an authenticated user with the Admin role.
+// Usage:
+//   [Authorize(Policy = "RequireAdmin")] on admin-only endpoints.
 // -----------------------------------------------------------------------------
 builder.Services.AddAuthorization(options =>
 {
@@ -159,6 +192,11 @@ builder.Services.AddAuthorization(options =>
 
 // -----------------------------------------------------------------------------
 // 7) Swagger / OpenAPI with Bearer
+// Configures:
+//   - Single document "v1" with title and description
+//   - Bearer security definition and requirement
+// Usage:
+//   In Swagger UI, click "Authorize" and enter "Bearer {token}".
 // -----------------------------------------------------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -194,6 +232,11 @@ builder.Services.AddSwaggerGen(options =>
 
 // -----------------------------------------------------------------------------
 // 8) CORS
+// Behavior:
+//   - If "Cors:AllowedOrigins" is configured, restrict to that list.
+//   - Else allow any origin (useful for local dev and Docker).
+// Tip:
+//   Do not call AllowCredentials with bearer tokens unless you need cookies.
 // -----------------------------------------------------------------------------
 const string CorsPolicyName = "BoBaCors";
 var allowedOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
@@ -207,7 +250,6 @@ builder.Services.AddCors(options =>
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod();
-            // Do NOT call .AllowCredentials() when using bearer tokens unless you truly need cookies
         }
         else
         {
@@ -220,13 +262,22 @@ builder.Services.AddCors(options =>
 
 // -----------------------------------------------------------------------------
 // 9) ProblemDetails
+// Adds RFC 7807 ProblemDetails responses for automatic error formatting.
 // -----------------------------------------------------------------------------
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
 // -----------------------------------------------------------------------------
-// 10) Ensure Identity DB migrations + seed default roles + admin user
+// 10) Identity migrations and seed (roles, admin, optional service user)
+// Flow:
+//   - Ensure database and migrations
+//   - Ensure "Admin" role
+//   - Create admin user if configured
+//   - Add configured role to the admin
+//   - Optionally create a service user for Web → API integration
+// Logging:
+//   - Writes the absolute path to the SQLite file for diagnostics
 // -----------------------------------------------------------------------------
 app.Logger.LogInformation("Identity DB connection: {cs}", identityCs);
 
@@ -274,7 +325,7 @@ using (var scope = app.Services.CreateScope())
                 app.Logger.LogInformation("Ensured admin user {email} has role {role}.", email, role);
         }
 
-        // Optional: seed a service user for the Web app
+        // Optional service user for background tasks or Web integration
         var svcEmail = cfg["Api:ServiceUser:Email"];
         var svcPassword = cfg["Api:ServiceUser:Password"];
         if (!string.IsNullOrWhiteSpace(svcEmail) && !string.IsNullOrWhiteSpace(svcPassword))
@@ -296,7 +347,7 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Log DB file location
+    // Log absolute path to SQLite file to help diagnose local vs Docker paths
     var cs = idDb.Database.GetDbConnection().ConnectionString;
     var sb = new SqliteConnectionStringBuilder(cs);
     var dbFile = sb.DataSource ?? "identity.db";
@@ -308,6 +359,14 @@ using (var scope = app.Services.CreateScope())
 
 // -----------------------------------------------------------------------------
 // 11) Middleware pipeline (order matters)
+// Sequence:
+//   - Swagger in Development
+//   - HTTPS redirection, Static files
+//   - CORS
+//   - Authentication, Authorization
+//   - MapControllers
+// Notes:
+//   If hosting behind a reverse proxy, configure ForwardedHeaders and HTTPS.
 // -----------------------------------------------------------------------------
 if (app.Environment.IsDevelopment())
 {
@@ -327,6 +386,11 @@ app.MapControllers();
 
 // -----------------------------------------------------------------------------
 // 12) MongoDB seeding
+// Flow:
+//   - Run idempotent data seeders and ensure indexes
+//   - Log target connection, DB name, and drink count for quick diagnostics
+// Failure:
+//   - Exceptions are caught and logged without crashing the host
 // -----------------------------------------------------------------------------
 using (var scope = app.Services.CreateScope())
 {

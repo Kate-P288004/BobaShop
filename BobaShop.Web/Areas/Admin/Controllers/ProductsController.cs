@@ -1,4 +1,19 @@
-﻿using System.Net;
+﻿// -----------------------------------------------------------------------------
+// File: Areas/Admin/Controllers/ProductsController.cs
+// Project: BobaShop.Web
+// Area: Admin
+// Security: Requires "RequireAdmin" policy (JWT attached via IApiAuthService)
+// Purpose:
+//   Server-side MVC controller for admin product management in the Web app.
+//   Talks to the API's Drinks endpoints using an authenticated HttpClient.
+//   Provides list, create, edit, and delete flows with TempData feedback.
+// Notes:
+//   - All API calls go through IApiAuthService to include the bearer token.
+//   - ModelState is enriched with API validation messages when available.
+//   - Views live under Areas/Admin/Views/Products/*
+// -----------------------------------------------------------------------------
+
+using System.Net;
 using System.Net.Http.Json;
 using BobaShop.Web.Models;
 using BobaShop.Web.Services;
@@ -13,9 +28,21 @@ public class ProductsController : Controller
 {
     private readonly IApiAuthService _apiAuth;
 
+    // Dependency injection:
+    // IApiAuthService creates HttpClient instances with the current user's JWT.
     public ProductsController(IApiAuthService apiAuth) => _apiAuth = apiAuth;
 
-    // -------------------- LIST --------------------
+    // -------------------------------------------------------------------------
+    // GET: /Admin/Products
+    // Renders list of drinks for admins.
+    // Flow:
+    //   1) Build an authenticated client.
+    //   2) Call API: GET api/v1/Drinks?take=200
+    //   3) Handle 401 with a friendly TempData message.
+    //   4) Deserialize to List<DrinkVm> and sort by Name before rendering.
+    // On failure:
+    //   Returns an empty list with TempData["Error"] set.
+    // -------------------------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> Index()
     {
@@ -34,7 +61,12 @@ public class ProductsController : Controller
         return View(items.OrderBy(x => x.Name).ToList());
     }
 
-    // -------------------- CREATE --------------------
+    // -------------------------------------------------------------------------
+    // GET: /Admin/Products/Create
+    // Shows the create form with sensible defaults.
+    // Defaults:
+    //   Sugar 50, Ice 50, IsActive true.
+    // -------------------------------------------------------------------------
     [HttpGet]
     public IActionResult Create()
     {
@@ -47,6 +79,17 @@ public class ProductsController : Controller
         return View(vm); // Areas/Admin/Views/Products/Create.cshtml
     }
 
+    // -------------------------------------------------------------------------
+    // POST: /Admin/Products/Create
+    // Creates a new drink via API POST api/v1/Drinks.
+    // Behavior:
+    //   - Validates ModelState.
+    //   - Sends a JSON payload matching API DTO fields.
+    //   - On API validation failure, surfaces errors into ModelState.
+    // UX:
+    //   - TempData["Ok"] on success, TempData["Error"] on failure.
+    //   - Redirects to Index after success to prevent resubmits.
+    // -------------------------------------------------------------------------
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(ProductCreateVm vm)
@@ -82,7 +125,16 @@ public class ProductsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // -------------------- EDIT --------------------
+    // -------------------------------------------------------------------------
+    // GET: /Admin/Products/Edit/{id}
+    // Loads a drink and maps it to EditDrinkVm for the form.
+    // Flow:
+    //   1) Guard against missing id.
+    //   2) GET api/v1/Drinks/{id}.
+    //   3) Map response to EditDrinkVm fields used by the view.
+    // ViewBag:
+    //   - ViewBag.DrinkId used by the form for route generation.
+    // -------------------------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> Edit(string id)
     {
@@ -114,13 +166,23 @@ public class ProductsController : Controller
             DefaultSugar = drink.DefaultSugar,
             DefaultIce = drink.DefaultIce,
             IsActive = drink.IsActive
-            // If you later add image editing, extend EditDrinkVm and map here.
+            // To support image editing, extend EditDrinkVm and map here.
         };
 
         ViewBag.DrinkId = drink.Id;
         return View(vm);
     }
 
+    // -------------------------------------------------------------------------
+    // POST: /Admin/Products/Edit/{id}
+    // Updates a drink via API PUT api/v1/Drinks/{id}.
+    // Behavior:
+    //   - Validates ModelState and keeps DrinkId in ViewBag when redisplaying.
+    //   - Sends only fields that API accepts for update.
+    // UX:
+    //   - TempData["Ok"] on success.
+    //   - On error, pushes API details into ModelState and redisplays form.
+    // -------------------------------------------------------------------------
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(string id, EditDrinkVm vm)
@@ -161,7 +223,13 @@ public class ProductsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // -------------------- DELETE --------------------
+    // -------------------------------------------------------------------------
+    // GET: /Admin/Products/Delete/{id}
+    // Shows a confirmation page populated from the API.
+    // Behavior:
+    //   - If API returns 404, show NotFound to match route semantics.
+    //   - For other errors, redirect back to Index with a message.
+    // -------------------------------------------------------------------------
     [HttpGet]
     public async Task<IActionResult> Delete(string id)
     {
@@ -185,6 +253,13 @@ public class ProductsController : Controller
         return View(drink);
     }
 
+    // -------------------------------------------------------------------------
+    // POST: /Admin/Products/Delete/{id}
+    // Confirms deletion via API DELETE api/v1/Drinks/{id}.
+    // Behavior:
+    //   - On 401 or other failures, show a message and bounce back to Delete page.
+    //   - On success, redirect to Index with a success banner.
+    // -------------------------------------------------------------------------
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(string id)
@@ -206,10 +281,20 @@ public class ProductsController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // -------------------- Helpers --------------------
+    // -------------------------------------------------------------------------
+    // Helper: AddApiErrorsToModelState
+    // Purpose:
+    //   Reads error details from the API response and adds them to ModelState.
+    // Supports:
+    //   - ValidationProblemDetails with field-level errors.
+    //   - ProblemDetails with a single detail message.
+    //   - Raw response body as a last resort.
+    // Rationale:
+    //   Keeps the user on the form with actionable messages.
+    // -------------------------------------------------------------------------
     private async Task AddApiErrorsToModelState(HttpResponseMessage resp)
     {
-        // Try ValidationProblemDetails shape first
+        // Try ValidationProblemDetails shape first (field-level errors)
         try
         {
             var vpd = await resp.Content.ReadFromJsonAsync<ValidationProblemDetails>();
@@ -226,7 +311,7 @@ public class ProductsController : Controller
         }
         catch { /* ignore parse errors */ }
 
-        // Fallback: plain ProblemDetails or raw text
+        // Fallback: ProblemDetails with a general message
         try
         {
             var pd = await resp.Content.ReadFromJsonAsync<ProblemDetails>();
@@ -238,6 +323,7 @@ public class ProductsController : Controller
         }
         catch { /* ignore parse errors */ }
 
+        // Last resort: dump raw body to ModelState
         var body = await resp.Content.ReadAsStringAsync();
         ModelState.AddModelError(string.Empty, $"API error {(int)resp.StatusCode}: {body}");
     }

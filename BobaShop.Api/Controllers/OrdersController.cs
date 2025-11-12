@@ -25,6 +25,9 @@ namespace BobaShop.Api.Controllers
     {
         // ---------------------------------------------------------------------
         // MongoDB collection references for Orders, Drinks, and Toppings
+        // Why keep direct IMongoCollection<T> fields?
+        // - Keeps query/update code concise and testable
+        // - Avoids repeated property access to the context per request
         // ---------------------------------------------------------------------
         private readonly IMongoCollection<Order> _orders;
         private readonly IMongoCollection<Drink> _drinks;
@@ -44,6 +47,11 @@ namespace BobaShop.Api.Controllers
         //   Retrieves a filtered list of orders from MongoDB.
         //   Supports filtering by customer email, order status, and date range.
         // Mapping: ICTPRG554 PE1.1 / PE1.2 / ICTPRG556 PE2.1
+        //
+        // Notes:
+        // - Soft-deleted orders (DeletedUtc != null) are excluded by default.
+        // - 'from'/'to' are interpreted as UTC (converted if provided).
+        // - Sorted newest → oldest to help dashboards show recent activity first.
         // ---------------------------------------------------------------------
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetAll(
@@ -82,6 +90,10 @@ namespace BobaShop.Api.Controllers
         // Purpose:
         //   Retrieve a single order by its ObjectId.
         //   Returns 404 if not found or invalid ID format.
+        //
+        // Notes:
+        // - Validates ObjectId format early to avoid server-side cast exceptions.
+        // - Excludes soft-deleted orders for consistency with list endpoint.
         // ---------------------------------------------------------------------
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetById(string id)
@@ -99,6 +111,12 @@ namespace BobaShop.Api.Controllers
         //   Creates a new order document with calculated total.
         //   Validates object IDs and auto-fills timestamps and default status.
         // Mapping: ICTPRG554 PE1.1 / ICTPRG556 PE2.1
+        //
+        // Behavior:
+        // - Filters incoming DrinkIds/ToppingIds to only valid ObjectIds.
+        // - Total is computed from current menu prices (avoids client tampering).
+        // - Status defaults to "New" if none provided.
+        // - CreatedUtc set server-side for auditability.
         // ---------------------------------------------------------------------
         [HttpPost]
         public async Task<ActionResult<Order>> Create([FromBody] OrderCreateDto dto)
@@ -135,6 +153,12 @@ namespace BobaShop.Api.Controllers
         // Purpose:
         //   Full update of an existing order (email, items, status).
         //   Recalculates total and updates timestamp.
+        //
+        // Notes:
+        // - Rejects invalid ObjectId format before querying DB.
+        // - Recomputes total using the same helper to keep logic DRY.
+        // - Does not modify CreatedUtc; sets UpdatedUtc to now (UTC).
+        // - Only updates if the order is not soft-deleted.
         // ---------------------------------------------------------------------
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(string id, [FromBody] OrderUpdateDto dto)
@@ -167,6 +191,11 @@ namespace BobaShop.Api.Controllers
         // PATCH: api/v1/orders/{id}/status
         // Purpose:
         //   Updates only the order’s status field.
+        //
+        // Notes:
+        // - Minimal payload DTO to reduce overposting risk.
+        // - Trims status; sets UpdatedUtc to support audit.
+        // - Fails fast on invalid id or missing status.
         // ---------------------------------------------------------------------
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] OrderStatusDto dto)
@@ -190,6 +219,10 @@ namespace BobaShop.Api.Controllers
         // Purpose:
         //   Performs a soft delete by setting DeletedUtc timestamp.
         //   Retains record for auditing and reporting.
+        //
+        // Notes:
+        // - Leaves the document in-place; downstream analytics can still read it.
+        // - Idempotent: repeated calls remain 204 if already soft-deleted.
         // ---------------------------------------------------------------------
         [HttpDelete("{id}")]
         public async Task<IActionResult> SoftDelete(string id)
@@ -208,6 +241,10 @@ namespace BobaShop.Api.Controllers
         // Helper: CalculateTotalAsync
         // Purpose:
         //   Computes total price by summing drink and topping prices.
+        //
+        // Why compute server-side?
+        // - Prevents clients from submitting arbitrary totals
+        // - Ensures consistency with current catalog prices
         // ---------------------------------------------------------------------
         private async Task<decimal> CalculateTotalAsync(IEnumerable<string> drinkIds, IEnumerable<string>? toppingIds)
         {
@@ -234,6 +271,10 @@ namespace BobaShop.Api.Controllers
         // Data Transfer Objects (DTOs)
         // Purpose:
         //   Lightweight models used for request payloads.
+        //
+        // Notes:
+        // - These are intentionally minimal to prevent overposting.
+        // - Validation is handled in the action methods (e.g., null/empty checks).
         // ---------------------------------------------------------------------
         public class OrderCreateDto
         {
